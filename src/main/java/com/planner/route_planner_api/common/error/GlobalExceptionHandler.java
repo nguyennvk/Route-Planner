@@ -60,6 +60,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler{
         return problem;
     }
 
+    @ExceptionHandler(IllegalActionException.class)
+    public ProblemDetail handleIllegalAction(IllegalActionException ex){
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, 
+            "You cannot perform the action.");
+        problem.setTitle("Action prohibited");
+        return problem;
+    }
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers,

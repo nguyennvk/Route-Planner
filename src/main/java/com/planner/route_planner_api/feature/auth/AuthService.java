@@ -94,9 +94,7 @@ public class AuthService {
     }
 
     @Transactional 
-    public String logout(String refreshToken){
-        refreshTokenRepository.findByTokenHash(RefreshTokenService.hash(refreshToken))
-            .ifPresent(t -> refreshTokenRepository.revokeFamily(t.getFamilyId(), Instant.now()));
-        return "Logout successfully";
+    public void logout(String refreshToken){
+        refreshTokenService.revoke(refreshToken);
     }
 }

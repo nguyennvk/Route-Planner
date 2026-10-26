@@ -14,6 +14,7 @@ import com.planner.route_planner_api.feature.auth.login.dto.LoginRequest;
 import com.planner.route_planner_api.feature.auth.login.dto.LoginResponse;
 import com.planner.route_planner_api.feature.auth.logout.dto.LogoutRequest;
 import com.planner.route_planner_api.feature.auth.me.dto.MeResponse;
+import com.planner.route_planner_api.feature.auth.refresh.dto.RefreshRequest;
 import com.planner.route_planner_api.feature.auth.register.dto.RegisterRequest;
 import com.planner.route_planner_api.feature.auth.register.dto.RegisterResponse;
 
@@ -51,8 +52,13 @@ public class AuthController {
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public String logout(@Valid @RequestBody LogoutRequest request) {
-        return authService.logout(request.refreshToken());
+    public void logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request.refreshToken());
     }
-    
+
+    @PostMapping("/refresh")
+    @ResponseStatus(HttpStatus.OK)
+    public LoginResponse refresh(@Valid @RequestBody RefreshRequest request) {
+        return authService.refresh(request.refreshToken());
+    }
 }

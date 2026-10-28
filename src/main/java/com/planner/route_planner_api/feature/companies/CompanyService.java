@@ -15,6 +15,8 @@ import com.planner.route_planner_api.feature.companies.company.dto.CompanyReques
 import com.planner.route_planner_api.feature.companies.company.dto.UpdateCompanyRequest;
 import com.planner.route_planner_api.feature.companies.member.dto.MemberRequest;
 import com.planner.route_planner_api.feature.companies.member.dto.MemberResponse;
+import com.planner.route_planner_api.feature.companies.member.dto.UpdateMemberRequest;
+import com.planner.route_planner_api.common.error.BadRequestException;
 import com.planner.route_planner_api.common.error.ConflictException;
 
 @Service 
@@ -43,9 +45,9 @@ public class CompanyService {
     }
 
     @Transactional 
-    public CompanyResponse getCompany(Long companyId, Long userId){
+    public CompanyResponse getCompany(Long userId, Long companyId){
         Company company = companyRepository.findByIdForMember(companyId, userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Company", companyId));
+                            .orElseThrow(() -> new ForbiddenException("Cannot perform the action"));
         return CompanyResponse.from(company); 
     }
 
@@ -96,5 +98,67 @@ public class CompanyService {
         }
         CompanyMember newMember = companyMemberRepository.saveAndFlush(new CompanyMember(company, user, request.role()));
         return MemberResponse.from(newMember);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MemberResponse> getMembers(Long userId, Long companyId, MemberRole role){
+        if (!companyMemberRepository.existsByCompanyIdAndUserIdAndRoleAndActiveTrue(companyId, userId, MemberRole.owner)){
+            throw new ForbiddenException("Cannot perform the action");
+        }
+        List<CompanyMember> members;
+        if (role == null){
+            members = companyMemberRepository.findActiveMembers(companyId);
+        }
+        else{
+            members = companyMemberRepository.findActiveMembersByRole(companyId, role);
+        }
+        return members.stream().map(MemberResponse::from).toList();
+
+    }
+
+    @Transactional
+    public MemberResponse updateMember(Long userId, Long companyId, Long memberId, UpdateMemberRequest request){
+        // Non-members get 404, non-owners get 403 (same rules as updateCompany)
+        CompanyMember membership = companyMemberRepository.findActiveMembership(companyId, userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Company", companyId));
+        if (membership.getRole() != MemberRole.owner) {
+            throw new ForbiddenException("Only the owner can update members");
+        }
+
+        // Owners can't demote or deactivate themselves, so every company always keeps at least one active owner
+        if (userId.equals(memberId)) {
+            throw new BadRequestException("You cannot change your own membership");
+        }
+
+        // findById, not findActiveMembership: an inactive member must be findable so they can be reactivated
+        CompanyMember member = companyMemberRepository.findById(new CompanyMemberId(companyId, memberId))
+            .orElseThrow(() -> new ResourceNotFoundException("Member", memberId));
+
+        // PATCH: only touch the fields the client sent
+        // No save() needed: Hibernate sees the change and runs the UPDATE when the transaction commits
+        if (request.role() != null) {
+            member.changeRole(request.role());
+        }
+        if (request.active() != null) {
+            if (request.active()) {
+                member.activate();
+            } else {
+                member.deactivate();
+            }
+        }
+        return MemberResponse.from(member);
+    }
+
+    @Transactional 
+    public void deleteMember(Long userId, Long companyId, Long memberId){
+        if (userId.equals(memberId)) {
+            throw new BadRequestException("You cannot remove yourself from the company");
+        }
+        if (!companyMemberRepository.existsByCompanyIdAndUserIdAndRoleAndActiveTrue(companyId, userId, MemberRole.owner)){
+            throw new ForbiddenException("Cannot perform the action");
+        }
+        CompanyMember member = companyMemberRepository.findById(new CompanyMemberId(companyId, memberId))
+            .orElseThrow(() -> new ResourceNotFoundException("Member", memberId));
+        member.deactivate();
     }
 }

@@ -11,9 +11,20 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Co
 
     List<CompanyMember> findByUserIdAndActiveTrue(Long userId);           // "which companies am I in?"
 
-    List<CompanyMember> findByCompanyIdAndRole(Long companyId, MemberRole role);  // "list this company's drivers"
+    @Query("""
+            select m from CompanyMember m
+            join fetch m.user
+            where m.company.id = :companyId and m.active = true
+            """)
+    List<CompanyMember> findActiveMembers(Long companyId);
 
-    boolean existsByCompanyIdAndUserIdAndRole(Long companyId, Long userId, MemberRole role);  // "is this user an owner?"
+    @Query("""
+            select m from CompanyMember m
+            join fetch m.user
+            where m.company.id = :companyId and m.active = true and m.role = :role
+            """)
+    List<CompanyMember> findActiveMembersByRole(Long companyId, MemberRole role);
+    boolean existsByCompanyIdAndUserIdAndRoleAndActiveTrue(Long companyId, Long userId, MemberRole role);  // "is this user an owner?"
 
     // The user's membership in one company, with the company loaded in the same query
     @Query("""
@@ -24,4 +35,14 @@ public interface CompanyMemberRepository extends JpaRepository<CompanyMember, Co
               and m.active = true
             """)
     Optional<CompanyMember> findActiveMembership(Long companyId, Long userId);
+    
+    @Query("""
+        select m from CompanyMember m
+        join fetch m.company
+        where m.company.id = :companyId
+            and m.user.id = :userId
+        """)
+    Optional<CompanyMember> findMembership(Long companyId, Long userId);
+
 }
+

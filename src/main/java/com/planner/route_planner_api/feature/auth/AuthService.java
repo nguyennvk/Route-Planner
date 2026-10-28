@@ -97,10 +97,6 @@ public class AuthService {
     public void logout(String refreshToken){
         refreshTokenService.revoke(refreshToken);
     }
-
-    // Deliberately NOT @Transactional: rotate() manages its own transaction. If this method
-    // had one too, the InvalidTokenException passing through here would roll back the
-    // family revoke that rotate() does on reuse.
     public LoginResponse refresh(String refreshToken) {
         RefreshTokenService.Rotation rotation = refreshTokenService.rotate(refreshToken);
         String accessToken = jwtService.generateAccessToken(rotation.user());

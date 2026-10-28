@@ -1,11 +1,11 @@
-package com.planner.route_planner_api.feature.companies.createCompany.dto;
+package com.planner.route_planner_api.feature.companies.company.dto;
 
 import com.planner.route_planner_api.common.validation.ValidTimezone;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-public record CreateCompanyRequest(
+public record CompanyRequest(
     @NotBlank @Size(max = 254)
     String name,
     
@@ -15,6 +15,6 @@ public record CreateCompanyRequest(
 ) {
     @Override
     public String toString(){
-        return "CreateCompanyRequest[name=" + name + ", timezone=" + timezone + "]";
+        return "CompanyRequest[name=" + name + ", timezone=" + timezone + "]";
     }
 }

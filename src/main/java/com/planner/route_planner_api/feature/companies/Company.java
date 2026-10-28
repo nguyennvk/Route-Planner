@@ -23,4 +23,12 @@ public class Company extends BaseEntity{
         this.name = name;
         this.timezone = timezone;
     }
+
+    public void rename(String name){
+        this.name = name;
+    }
+
+    public void changeTimezone(String timezone){
+        this.timezone = timezone;
+    }
 }

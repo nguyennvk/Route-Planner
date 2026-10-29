@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
+import com.planner.route_planner_api.common.validation.PinValidation;
 import com.planner.route_planner_api.feature.addresses.Address;
 import com.planner.route_planner_api.feature.addresses.AddressRepository;
 import com.planner.route_planner_api.feature.addresses.AddressSuggestionSigner;
@@ -30,10 +31,6 @@ import com.planner.route_planner_api.common.error.ConflictException;
 @Service
 public class CompanyService {
 
-    // Manual pins must land in Canada (the geocoder only searches Canada too).
-    // A rough box around the country: catches 0,0 and swapped lat/lng, not every point outside the border.
-    private static final double MIN_LATITUDE = 41.6, MAX_LATITUDE = 83.2;
-    private static final double MIN_LONGITUDE = -141.1, MAX_LONGITUDE = -52.6;
 
     private final CompanyMemberRepository companyMemberRepository;
     private final CompanyRepository companyRepository;
@@ -185,21 +182,9 @@ public class CompanyService {
                 signed.latitude(), signed.longitude(), signed.accuracy());
         } else {
             // From a map pin: the user is the source, so just check the point is sensible
-            requirePin(request);
+            PinValidation.requirePin(request);
             address = Address.pinned(company, request.rawAddress().strip(), request.latitude(), request.longitude());
         }
         return CreateAddressResponse.from(addressRepository.save(address));
-    }
-
-    private static void requirePin(CreateAddressRequest request) {
-        if (request.rawAddress() == null || request.rawAddress().isBlank()
-                || request.latitude() == null || request.longitude() == null) {
-            throw new BadRequestException("Send a suggestion token, or rawAddress with latitude and longitude");
-        }
-        double lat = request.latitude();
-        double lng = request.longitude();
-        if (lat < MIN_LATITUDE || lat > MAX_LATITUDE || lng < MIN_LONGITUDE || lng > MAX_LONGITUDE) {
-            throw new BadRequestException("The pin must be in Canada");
-        }
     }
 }

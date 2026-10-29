@@ -89,4 +89,11 @@ public class Address extends BaseEntity {
     public Double getLongitude() {
         return location == null ? null : location.getX();
     }
+
+    public void updatePin(double latitude, double longitude){
+        this.location = GEOMETRY.createPoint(new Coordinate(longitude, latitude));
+        this.geocodeSource = GeocodeSourceType.manual_pin;
+        this.geocodeConfidence = null;
+    }
+
 }

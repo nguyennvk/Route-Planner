@@ -60,6 +60,19 @@ CREATE TABLE company_members (
 CREATE INDEX company_members_user_id_idx         ON company_members (user_id);           -- "which companies am I in?"
 CREATE INDEX company_members_company_id_role_idx ON company_members (company_id, role);  -- "list this company's drivers"
 
+-- Only the hash of each refresh token is stored; a family is one login and its rotations.
+CREATE TABLE refresh_tokens (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id bigint NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    token_hash text NOT NULL UNIQUE,
+    family_id uuid NOT NULL,
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX refresh_tokens_user_id_idx   ON refresh_tokens (user_id);
+CREATE INDEX refresh_tokens_family_id_idx ON refresh_tokens (family_id);
+
 
 -- =============================================================================
 -- Places
@@ -68,20 +81,20 @@ CREATE INDEX company_members_company_id_role_idx ON company_members (company_id,
 CREATE TABLE addresses (
     id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     company_id         bigint NOT NULL REFERENCES companies (id),
-    raw_text           text   NOT NULL CHECK (length(raw_text) <= 512),
-    normalized_text    text            CHECK (length(normalized_text) <= 512),
+    raw_address        text   NOT NULL CHECK (length(raw_address) <= 512),
+    normalized_address text            CHECK (length(normalized_address) <= 512),
     location           geography(Point, 4326),
     geocode_confidence numeric(3, 2)   CHECK (geocode_confidence BETWEEN 0 AND 1),
-    geocode_source     text            CHECK (geocode_source IN ('nominatim', 'google', 'manual_pin')),
+    geocode_source     text,
     created_at         timestamptz NOT NULL DEFAULT now(),
 
     -- a location and its source are set together
     CHECK ((location IS NULL) = (geocode_source IS NULL))
 );
-CREATE INDEX addresses_company_id_normalized_text_idx ON addresses (company_id, normalized_text);  -- dedupe before geocoding
+CREATE INDEX addresses_company_id_normalized_address_idx ON addresses (company_id, normalized_address);  -- dedupe before geocoding
 CREATE INDEX addresses_location_idx ON addresses USING gist (location);                            -- stops near a point
 
-COMMENT ON COLUMN addresses.raw_text IS 'exactly what the user typed or imported';
+COMMENT ON COLUMN addresses.raw_address IS 'exactly what the user typed or imported';
 COMMENT ON COLUMN addresses.location IS 'null until geocoded';
 
 CREATE TABLE depots (

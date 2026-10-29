@@ -15,9 +15,12 @@ import com.planner.route_planner_api.feature.addresses.dto.AddressSuggestionResp
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
 
 @RestController
-@RequestMapping("/api/v1/addresses")
+@RequestMapping("/api/v1")
 public class AddressController {
 
     private final AddressService addressService;
@@ -26,7 +29,7 @@ public class AddressController {
         this.addressService = addressService;
     }
 
-    @GetMapping("/suggestion")
+    @GetMapping("/addresses/suggestion")
     @ResponseStatus(HttpStatus.OK)
     public List<AddressSuggestionResponse> suggest(
         @AuthenticationPrincipal Jwt jwt,
@@ -36,11 +39,7 @@ public class AddressController {
         return addressService.suggest(userId, rawAddress);
     }
 
-    // TODO: Batch upload
-
-
     
-
 
 
 }

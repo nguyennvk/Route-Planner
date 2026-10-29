@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.planner.route_planner_api.feature.companies.company.dto.CompanyResponse;
+import com.planner.route_planner_api.feature.addresses.dto.CreateAddressRequest;
+import com.planner.route_planner_api.feature.addresses.dto.CreateAddressResponse;
 import com.planner.route_planner_api.feature.companies.company.dto.CompanyRequest;
 import com.planner.route_planner_api.feature.companies.company.dto.UpdateCompanyRequest;
 import com.planner.route_planner_api.feature.companies.member.dto.MemberResponse;
@@ -118,6 +120,16 @@ public class CompanyController {
         Long userId = Long.valueOf(jwt.getSubject());
         companyService.deleteMember(userId, companyId, memberId);
     }
-    
-    
+
+    // Body is either { "token": "..." } from a suggestion, or { "rawAddress", "latitude", "longitude" } for a map pin
+    @PostMapping("/{companyId}/address")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CreateAddressResponse postAddress(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long companyId,
+        @Valid @RequestBody CreateAddressRequest request
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return companyService.postAddress(userId, companyId, request);
+    }
 }

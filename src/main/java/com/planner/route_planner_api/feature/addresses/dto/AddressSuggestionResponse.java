@@ -9,7 +9,8 @@ public record AddressSuggestionResponse(
     double latitude,
     double longitude,
     boolean precise,        // false -> can't be added as is; open the pin map at this point instead
-    String token            // null when not precise
+    String token,           // null when not precise
+    String geocodeSource
 ) {
     public static AddressSuggestionResponse from(GeocodeCandidate candidate, String token) {
         return new AddressSuggestionResponse(
@@ -17,7 +18,8 @@ public record AddressSuggestionResponse(
             candidate.latitude(),
             candidate.longitude(),
             candidate.precise(),
-            token
+            token,
+            candidate.source()
         );
     }
 }

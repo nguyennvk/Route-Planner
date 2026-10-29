@@ -58,6 +58,13 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>io.github.deansg</groupId>
+			<artifactId>jeocodio</artifactId>
+			<version>0.3.0</version>
+		</dependency>
+
+
 
 
 		<dependency>
@@ -100,7 +107,7 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
-			
+
 			<plugin>
 			<groupId>org.apache.maven.plugins</groupId>
 			<artifactId>maven-compiler-plugin</artifactId>

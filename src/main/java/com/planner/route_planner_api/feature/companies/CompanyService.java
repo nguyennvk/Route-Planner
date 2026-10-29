@@ -1,12 +1,17 @@
 package com.planner.route_planner_api.feature.companies;
 
+import com.planner.route_planner_api.feature.depots.Depot;
+import com.planner.route_planner_api.feature.depots.DepotRepository;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
+import com.planner.route_planner_api.common.web.PageResponse;
 import com.planner.route_planner_api.common.validation.PinValidation;
 import com.planner.route_planner_api.feature.addresses.Address;
 import com.planner.route_planner_api.feature.addresses.AddressRepository;
@@ -22,6 +27,8 @@ import com.planner.route_planner_api.feature.companies.company.dto.UpdateCompany
 import com.planner.route_planner_api.feature.companies.member.dto.MemberRequest;
 import com.planner.route_planner_api.feature.companies.member.dto.MemberResponse;
 import com.planner.route_planner_api.feature.companies.member.dto.UpdateMemberRequest;
+import com.planner.route_planner_api.feature.depots.dto.DepotRequest;
+import com.planner.route_planner_api.feature.depots.dto.DepotResponse;
 import com.planner.route_planner_api.common.error.BadRequestException;
 import com.planner.route_planner_api.common.error.ConflictException;
 
@@ -32,6 +39,7 @@ import com.planner.route_planner_api.common.error.ConflictException;
 public class CompanyService {
 
 
+    private final DepotRepository depotRepository;
     private final CompanyMemberRepository companyMemberRepository;
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
@@ -45,7 +53,7 @@ public class CompanyService {
             UserRepository userRepository,
             AddressRepository addressRepository,
             CompanyAccess companyAccess,
-            AddressSuggestionSigner suggestionSigner
+            AddressSuggestionSigner suggestionSigner, DepotRepository depotRepository
         ){
         this.companyRepository = companyRepository;
         this.companyMemberRepository = companyMemberRepository;
@@ -53,6 +61,7 @@ public class CompanyService {
         this.addressRepository = addressRepository;
         this.companyAccess = companyAccess;
         this.suggestionSigner = suggestionSigner;
+        this.depotRepository = depotRepository;
     }
 
     @Transactional
@@ -171,20 +180,46 @@ public class CompanyService {
     public CreateAddressResponse postAddress(Long userId, Long companyId, CreateAddressRequest request){
         CompanyMember membership = companyAccess.requireMember(companyId, userId);
         companyAccess.requireOwner(membership);
-        Company company = membership.getCompany();
+        return CreateAddressResponse.from(createAddress(membership.getCompany(), userId, request));
+    }
 
+    @Transactional
+    public DepotResponse createDepot(Long userId, Long companyId, DepotRequest request){
+        CompanyMember membership = companyAccess.requireMember(companyId, userId);
+        companyAccess.requireOwner(membership);
+        Company company = membership.getCompany();
+        Address address = createAddress(company, userId, request.address());
+        Depot depot = depotRepository.save(new Depot(company, request.name().trim(), address));
+        return DepotResponse.from(depot);
+    }
+
+    // Reads are open to every active member (drivers need to see where routes start)
+    @Transactional(readOnly = true)
+    public PageResponse<DepotResponse> listDepots(Long userId, Long companyId, int page, int size){
+        companyAccess.requireMember(companyId, userId);
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by("id"));
+        return PageResponse.from(depotRepository.findPageByCompanyId(companyId, pageRequest).map(DepotResponse::from));
+    }
+
+    @Transactional(readOnly = true)
+    public DepotResponse getDepot(Long userId, Long companyId, Long depotId){
+        companyAccess.requireMember(companyId, userId);
+        // Scoped to the company: a depot id from another company is "not found", not someone else's depot
+        Depot depot = depotRepository.findByIdAndCompanyId(depotId, companyId)
+            .orElseThrow(() -> new ResourceNotFoundException("Depot", depotId));
+        return DepotResponse.from(depot);
+    }
+
+    private Address createAddress(Company company, Long userId, CreateAddressRequest request){
         Address address;
         if (request.token() != null) {
-            // From a suggestion: use only the values the server signed. The body's lat/lng are ignored,
-            // so a client can't attach made-up coordinates to a real address.
             SignedAddress signed = suggestionSigner.verify(request.token(), userId);
             address = Address.geocoded(company, signed.rawText(), signed.formattedAddress(),
                 signed.latitude(), signed.longitude(), signed.accuracy());
         } else {
-            // From a map pin: the user is the source, so just check the point is sensible
             PinValidation.requirePin(request);
             address = Address.pinned(company, request.rawAddress().strip(), request.latitude(), request.longitude());
         }
-        return CreateAddressResponse.from(addressRepository.save(address));
-    }
+        return addressRepository.save(address);
+    }       
 }

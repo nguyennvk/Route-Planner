@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.planner.route_planner_api.common.web.PageResponse;
 import com.planner.route_planner_api.feature.companies.company.dto.CompanyResponse;
 import com.planner.route_planner_api.feature.addresses.dto.CreateAddressRequest;
 import com.planner.route_planner_api.feature.addresses.dto.CreateAddressResponse;
@@ -12,8 +13,12 @@ import com.planner.route_planner_api.feature.companies.company.dto.UpdateCompany
 import com.planner.route_planner_api.feature.companies.member.dto.MemberResponse;
 import com.planner.route_planner_api.feature.companies.member.dto.MemberRequest;
 import com.planner.route_planner_api.feature.companies.member.dto.UpdateMemberRequest;
+import com.planner.route_planner_api.feature.depots.dto.DepotRequest;
+import com.planner.route_planner_api.feature.depots.dto.DepotResponse;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 import java.util.List;
 
@@ -38,7 +43,7 @@ public class CompanyController {
 
     private final CompanyService companyService;
 
-    public CompanyController(CompanyService companyService, CompanyMemberRepository companyMemberRepository){
+    public CompanyController(CompanyService companyService){
         this.companyService = companyService;
     }
 
@@ -132,4 +137,40 @@ public class CompanyController {
         Long userId = Long.valueOf(jwt.getSubject());
         return companyService.postAddress(userId, companyId, request);
     }
+
+    // Body: { "name": "...", "address": { "token": "..." } } or address as a map pin { "rawAddress", "latitude", "longitude" }
+    @PostMapping("/{companyId}/depots")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DepotResponse createDepot(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long companyId,
+        @RequestBody @Valid DepotRequest request
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return companyService.createDepot(userId, companyId, request);
+    }
+
+    @GetMapping("/{companyId}/depots")
+    @ResponseStatus(HttpStatus.OK)
+    public PageResponse<DepotResponse> listDepots(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long companyId,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return companyService.listDepots(userId, companyId, page, size);
+    }
+
+    @GetMapping("/{companyId}/depots/{depotId}")
+    @ResponseStatus(HttpStatus.OK)
+    public DepotResponse getDepot(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long companyId,
+        @PathVariable Long depotId
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return companyService.getDepot(userId, companyId, depotId);
+    }
+
 }

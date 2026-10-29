@@ -17,7 +17,6 @@ import com.planner.route_planner_api.feature.addresses.address_api.AddressAPI;
 import com.planner.route_planner_api.feature.addresses.dto.AddressSuggestionResponse;
 import com.planner.route_planner_api.feature.addresses.dto.CreateAddressResponse;
 import com.planner.route_planner_api.feature.addresses.dto.PinRequest;
-import com.planner.route_planner_api.feature.companies.Company;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.companies.CompanyMember;
 

@@ -25,9 +25,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-// Mapped at /api/v1 because the routes mix /companies/{id}/addresses (list)
-// and /addresses/{id} (one address, whose company is known from the address itself).
-// Creating an address is POST /companies/{id}/addresses in CompanyController.
+
 @RestController
 @RequestMapping("/api/v1")
 public class AddressController {

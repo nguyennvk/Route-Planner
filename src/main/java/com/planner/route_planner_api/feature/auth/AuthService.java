@@ -3,7 +3,6 @@ package com.planner.route_planner_api.feature.auth;
 import com.planner.route_planner_api.feature.auth.token.JwtProperties;
 import com.planner.route_planner_api.feature.auth.token.RefreshTokenRepository;
 
-import java.time.Instant;
 import java.util.Locale;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import com.planner.route_planner_api.common.error.BadCredentialException;
 import com.planner.route_planner_api.common.error.ConflictException;
-import com.planner.route_planner_api.common.error.IllegalActionException;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
 import com.planner.route_planner_api.feature.auth.login.dto.LoginResponse;
 import com.planner.route_planner_api.feature.auth.me.dto.MeResponse;
@@ -19,7 +17,6 @@ import com.planner.route_planner_api.feature.auth.login.dto.LoginRequest;
 import com.planner.route_planner_api.feature.auth.register.dto.RegisterRequest;
 import com.planner.route_planner_api.feature.auth.register.dto.RegisterResponse;
 import com.planner.route_planner_api.feature.auth.token.JwtService;
-import com.planner.route_planner_api.feature.auth.token.RefreshToken;
 import com.planner.route_planner_api.feature.auth.token.RefreshTokenService;
 
 import jakarta.transaction.Transactional;
@@ -27,7 +24,6 @@ import jakarta.transaction.Transactional;
 @Service
 public class AuthService {
 
-    private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -38,14 +34,13 @@ public class AuthService {
         UserRepository userRepository,
         PasswordEncoder passwordEncoder, 
         JwtService jwtService, 
-        RefreshTokenService refreshTokenService, JwtProperties jwtProperties, RefreshTokenRepository refreshTokenRepository
+        RefreshTokenService refreshTokenService, JwtProperties jwtProperties
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.jwtProperties = jwtProperties;
-        this.refreshTokenRepository = refreshTokenRepository;
     }
 
     @Transactional

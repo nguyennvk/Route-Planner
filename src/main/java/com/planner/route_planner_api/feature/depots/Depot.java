@@ -1,5 +1,6 @@
 package com.planner.route_planner_api.feature.depots;
 
+import com.planner.route_planner_api.feature.addresses.Address;
 import com.planner.route_planner_api.feature.companies.Company;
 
 import jakarta.persistence.Column;
@@ -32,23 +33,23 @@ public class Depot {
     @Column(nullable = false, length = 254)
     private String name;
 
-    // Plain id for now; becomes @ManyToOne Address once the Address entity exists
-    @Column(name = "address_id", nullable = false)
-    private Long addressId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "address_id", nullable = false)
+    private Address address;
 
     protected Depot() {}
 
-    public Depot(Company company, String name, Long addressId) {
+    public Depot(Company company, String name, Address address) {
         this.company = company;
         this.name = name;
-        this.addressId = addressId;
+        this.address = address;
     }
 
     public void rename(String name) {
         this.name = name;
     }
 
-    public void changeAddress(Long addressId) {
-        this.addressId = addressId;
+    public void changeAddress(Address address) {
+        this.address = address;
     }
 }

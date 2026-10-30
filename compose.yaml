@@ -48,6 +48,13 @@ services:
       db:
         condition: service_healthy
 
+  timefold:
+    # Timefold's vehicle-routing quickstart: demo UI and REST API for route optimisation
+    build: ./docker/timefold
+    ports:
+      # The app listens on 8080 inside the container; 9000 on this Mac
+      - "9000:8080"
+
 volumes:
   db-data:
   pgadmin-data:

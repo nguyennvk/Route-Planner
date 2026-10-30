@@ -2,6 +2,8 @@
 1. Check that every query is on index
 2. Make sure that user_id and email is lowercase
 3. Add version to table when applicable
+4. Using OSRM for distance matrix over GraphHopper because it is faster and free.
+However, the limit is that i need to prepare the map for each kind vehicle (to be look at later)
 
 ## What I learn
 1. The N + 1 problem (sovle by join fetch which preload the reference table)

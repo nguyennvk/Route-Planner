@@ -76,6 +76,43 @@ INSERT INTO depots (id, company_id, name, address_id) OVERRIDING SYSTEM VALUE VA
     (3, 3, 'North York depot', 13),
     (4, 4, 'Vancouver waterfront depot', 19);
 
+-- 10 vehicles, each based at its company's depot. Sizes are mixed on purpose:
+--   the small cars (2, 8) can't carry the heaviest single orders (111-129 kg on Tue 3 Nov),
+--   vehicle 3 has no shifts (a spare), vehicle 6 is inactive (retired),
+--   vehicle 10 is a cargo motorbike with a shift but no driver assigned yet
+INSERT INTO vehicles (id, company_id, name, type, capacity_kg, capacity_m3, home_depot_id, active) OVERRIDING SYSTEM VALUE VALUES
+    (1,  1, 'Van 1',            'van',       800.00,  6.000, 1, true),
+    (2,  1, 'Car 1',            'car',       100.00,  0.500, 1, true),
+    (3,  1, 'Van 2 (spare)',    'van',       800.00,  6.000, 1, true),
+    (4,  2, 'Van A',            'van',       600.00,  5.000, 2, true),
+    (5,  2, 'Van B',            'van',       600.00,  5.000, 2, true),
+    (6,  2, 'Old van',          'van',       500.00,  4.000, 2, false),
+    (7,  3, 'Truck 1',          'truck',    2000.00, 15.000, 3, true),
+    (8,  3, 'Car 1',            'car',       150.00,  0.600, 3, true),
+    (9,  4, 'Refrigerated van', 'van',       700.00,  5.500, 4, true),
+    (10, 4, 'Cargo motorbike',  'motorbike',  40.00,  0.150, 4, true);
+
+-- Shifts on Mon 2 and Tue 3 Nov 2026 (the order dates), written in each company's local time and
+-- stored in UTC. Toronto is UTC-5 and Vancouver UTC-8 that week (DST ended 1 Nov).
+-- Drivers are the company's own driver members; no vehicle or driver has two shifts at once.
+INSERT INTO vehicle_shifts (id, vehicle_id, driver_user_id, start_at, end_at) OVERRIDING SYSTEM VALUE VALUES
+    -- Mon 2 Nov
+    (1,  1, 4,    timestamp '2026-11-02 08:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-02 17:00' AT TIME ZONE 'America/Toronto'),     -- Liam, Van 1
+    (2,  2, 5,    timestamp '2026-11-02 08:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-02 17:00' AT TIME ZONE 'America/Toronto'),     -- Aisha, Car 1
+    (3,  4, 6,    timestamp '2026-11-02 07:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-02 15:00' AT TIME ZONE 'America/Toronto'),     -- Noah, Van A (bakery starts early)
+    (4,  5, 7,    timestamp '2026-11-02 07:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-02 15:00' AT TIME ZONE 'America/Toronto'),     -- Emma, Van B
+    (5,  7, 8,    timestamp '2026-11-02 08:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-02 17:00' AT TIME ZONE 'America/Toronto'),     -- Daniel, Truck 1
+    (6,  8, 9,    timestamp '2026-11-02 09:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-02 18:00' AT TIME ZONE 'America/Toronto'),     -- Priya, Car 1
+    (7,  9, 10,   timestamp '2026-11-02 08:00' AT TIME ZONE 'America/Vancouver', timestamp '2026-11-02 17:00' AT TIME ZONE 'America/Vancouver'),   -- Lucas, Refrigerated van
+    (8,  10, NULL, timestamp '2026-11-02 10:00' AT TIME ZONE 'America/Vancouver', timestamp '2026-11-02 14:00' AT TIME ZONE 'America/Vancouver'),  -- no driver yet, Cargo motorbike
+    -- Tue 3 Nov
+    (9,  1, 4,    timestamp '2026-11-03 08:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-03 17:00' AT TIME ZONE 'America/Toronto'),     -- Liam, Van 1
+    (10, 2, 5,    timestamp '2026-11-03 12:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-03 20:00' AT TIME ZONE 'America/Toronto'),     -- Aisha, Car 1 (afternoon)
+    (11, 4, 7,    timestamp '2026-11-03 07:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-03 15:00' AT TIME ZONE 'America/Toronto'),     -- Emma, Van A (Noah is off)
+    (12, 7, 9,    timestamp '2026-11-03 08:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-03 17:00' AT TIME ZONE 'America/Toronto'),     -- Priya, Truck 1
+    (13, 8, 8,    timestamp '2026-11-03 08:00' AT TIME ZONE 'America/Toronto',   timestamp '2026-11-03 12:00' AT TIME ZONE 'America/Toronto'),     -- Daniel, Car 1 (half day)
+    (14, 9, 10,   timestamp '2026-11-03 08:00' AT TIME ZONE 'America/Vancouver', timestamp '2026-11-03 17:00' AT TIME ZONE 'America/Vancouver');   -- Lucas, Refrigerated van
+
 -- 5 customers per company, each with a default address
 INSERT INTO customers (id, company_id, name, phone, email, default_address_id) OVERRIDING SYSTEM VALUE VALUES
     (1, 1, 'Hannah Lee', '+14165550201', 'hannah.lee@example.com', 2),
@@ -187,6 +224,8 @@ SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT max(id) FROM users)
 SELECT setval(pg_get_serial_sequence('companies', 'id'), (SELECT max(id) FROM companies));
 SELECT setval(pg_get_serial_sequence('addresses', 'id'), (SELECT max(id) FROM addresses));
 SELECT setval(pg_get_serial_sequence('depots', 'id'), (SELECT max(id) FROM depots));
+SELECT setval(pg_get_serial_sequence('vehicles', 'id'), (SELECT max(id) FROM vehicles));
+SELECT setval(pg_get_serial_sequence('vehicle_shifts', 'id'), (SELECT max(id) FROM vehicle_shifts));
 SELECT setval(pg_get_serial_sequence('customers', 'id'), (SELECT max(id) FROM customers));
 SELECT setval(pg_get_serial_sequence('items', 'id'), (SELECT max(id) FROM items));
 SELECT setval(pg_get_serial_sequence('orders', 'id'), (SELECT max(id) FROM orders));

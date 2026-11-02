@@ -1,7 +1,6 @@
 package com.planner.route_planner_api.feature.auth;
 
 import com.planner.route_planner_api.feature.auth.token.JwtProperties;
-import com.planner.route_planner_api.feature.auth.token.RefreshTokenRepository;
 
 import java.util.Locale;
 

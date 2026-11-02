@@ -70,7 +70,7 @@ public class AddressController {
         return addressService.getAddress(userId, addressId);
     }
 
-    @PatchMapping("/addresses/{addressId}/location")
+    @PatchMapping("/addresses/{addressId}")
     @ResponseStatus(HttpStatus.OK)
     public CreateAddressResponse changePin(
         @AuthenticationPrincipal Jwt jwt,

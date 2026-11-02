@@ -4,7 +4,8 @@
 3. Add version to table when applicable
 4. Using OSRM for distance matrix over GraphHopper because it is faster and free.
 However, the limit is that i need to prepare the map for each kind vehicle (to be look at later)
-
+5. Twist the planner algorithm for better result
+6. Handle int, bigdecimal, decimal miss match for weight, m3. Important type Double vs Long in OsrmTableResponse
 ## What I learn
 1. The N + 1 problem (sovle by join fetch which preload the reference table)
 2. save vs saveAndFlush. Hibernate prioritize the read and write will be store in a place where i only flush when the Transactional is done. That is why save will return the old (before the change) value. You need to flush to immediately see the changes. saveAndFlush is used when you read the value right after you write.

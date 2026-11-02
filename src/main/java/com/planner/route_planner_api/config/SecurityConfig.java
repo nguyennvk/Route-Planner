@@ -27,8 +27,7 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.planner.route_planner_api.feature.auth.token.JwtProperties;
 
 @Configuration
-@EnableWebSecurity 
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableWebSecurity
 public class SecurityConfig {
 
     @Bean

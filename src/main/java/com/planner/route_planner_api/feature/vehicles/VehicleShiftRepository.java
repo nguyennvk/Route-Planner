@@ -1,6 +1,8 @@
 package com.planner.route_planner_api.feature.vehicles;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -71,4 +73,11 @@ public interface VehicleShiftRepository extends JpaRepository<VehicleShift, Long
               and s.startAt < :endAt and s.endAt > :startAt
             """)
     long countDriverOverlaps(Long driverUserId, Instant startAt, Instant endAt, Long ignoreShiftId);
+
+    @Query("""
+        select s from VehicleShift s
+        join fetch s.vehicle v
+        where v.company.id = :companyId and s.id in :shiftIds
+        """)
+    List<VehicleShift> findByVehicleCompanyIdAndIdIn(Long companyId, Collection<Long> shiftIds);
 }

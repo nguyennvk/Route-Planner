@@ -1,0 +1,236 @@
+package com.planner.route_planner_api.feature.planning;
+
+import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.springframework.stereotype.Service;
+
+import com.planner.route_planner_api.feature.addresses.Address;
+import com.planner.route_planner_api.feature.addresses.AddressRepository;
+import com.planner.route_planner_api.feature.companies.CompanyAccess;
+import com.planner.route_planner_api.feature.companies.CompanyMember;
+import com.planner.route_planner_api.feature.orders.Order;
+import com.planner.route_planner_api.feature.orders.OrderRepository;
+import com.planner.route_planner_api.feature.orders.OrderStatus;
+import com.planner.route_planner_api.feature.planning.distance_matrix_provider.OsrmAPI;
+import com.planner.route_planner_api.feature.planning.distance_matrix_provider.OsrmTableResponse;
+import com.planner.route_planner_api.feature.planning.dto.PlanRequest;
+import com.planner.route_planner_api.feature.planning.dto.PlanResponse;
+import com.planner.route_planner_api.feature.planning.optimizer.Location;
+import com.planner.route_planner_api.feature.planning.optimizer.PlannedVehicle;
+import com.planner.route_planner_api.feature.planning.optimizer.VehicleRoutePlan;
+import com.planner.route_planner_api.feature.planning.optimizer.VehicleRoutePlanMock;
+import com.planner.route_planner_api.feature.planning.optimizer.Visit;
+import com.planner.route_planner_api.feature.vehicles.Vehicle;
+import com.planner.route_planner_api.feature.vehicles.VehicleRepository;
+import com.planner.route_planner_api.feature.vehicles.VehicleShift;
+import com.planner.route_planner_api.feature.vehicles.VehicleShiftRepository;
+
+import ai.timefold.solver.core.api.solver.SolverJob;
+import ai.timefold.solver.core.api.solver.SolverManager;
+import jakarta.persistence.Entity;
+import jakarta.transaction.Transactional;
+
+@Service
+public class PlanningService {
+
+    // Created by the Timefold starter from the @PlanningSolution class; just ask for it here
+    private final SolverManager<VehicleRoutePlan> solverManager;
+    private final VehicleRepository vehicleRepository;
+    private final AddressRepository addressRepository;
+    private final CompanyAccess companyAccess;
+    private final VehicleShiftRepository vehicleShiftRepository;
+    private final OrderRepository orderRepository;
+    private final OsrmAPI osrmAPI;
+
+    public PlanningService(
+        SolverManager<VehicleRoutePlan> solverManager,
+        AddressRepository addressRepository,
+        VehicleRepository vehicleRepository,
+        CompanyAccess companyAccess,
+        VehicleShiftRepository vehicleShiftRepository,
+        OrderRepository orderRepository,
+        OsrmAPI osrmAPI
+    ) {
+        this.solverManager = solverManager;
+        this.addressRepository = addressRepository;
+        this.vehicleRepository = vehicleRepository;
+        this.companyAccess = companyAccess;
+        this.vehicleShiftRepository = vehicleShiftRepository;
+        this.orderRepository = orderRepository;
+        this.osrmAPI = osrmAPI;
+    }
+
+
+    // Solves the hand-made mock (1 van, 2 visits) and waits for the answer.
+    // Blocks the request until the solver stops: 5 s without improvement, 30 s at most (application.properties)
+    public PlanResponse solveMock() {
+        VehicleRoutePlan problem = VehicleRoutePlanMock.create();
+
+        SolverJob<VehicleRoutePlan> job = solverManager.solve(UUID.randomUUID(), problem);
+        try {
+            // Use the returned plan: Timefold solves a copy, so `problem` itself stays unsolved
+            VehicleRoutePlan solved = job.getFinalBestSolution();
+            System.out.println(solved);
+            return PlanResponse.from(solved);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Solving was interrupted", e);
+        } catch (ExecutionException e) {
+            // Something threw inside the solver, e.g. a constraint or the arrival time calculation
+            throw new IllegalStateException("Solving failed", e.getCause());
+        }
+    }
+
+    @Transactional 
+    public PlanResponse solve(
+        Long userId,
+        Long companyId,
+        PlanRequest request
+    ) {
+        companyAccess.requireOwner(companyAccess.requireMember(companyId, userId));
+        List<Order> orders = orderRepository.findByCompanyIdAndStatusAndIdIn(companyId, OrderStatus.pending, request.orderIds());
+        // Get invalid orderIds
+        List<Long> invalidOrderIds = extractInvalidIds(orders, request.orderIds(), Order::getId);
+
+        // Retrieve data from request
+        List<VehicleShift> shifts = vehicleShiftRepository.findByVehicleCompanyIdAndIdIn(companyId, request.shiftIds());
+        // Get invalid shiftIds
+        List<Long> invalidShiftIds = extractInvalidIds(shifts, request.shiftIds(), VehicleShift::getId);
+
+        List<PlannedVehicle> plannedVehicles = getPlannedVehicles(shifts);
+        LocalDateTime[] timeBound = getTimeBound(plannedVehicles);
+        List<Visit> visits = getVisits(orders);
+
+        // Create a distance table using OSRM
+        List<Location> locationList = getLocationLists(plannedVehicles, visits);
+        Double[][] longLatList = getLongLatLists(locationList);
+        OsrmTableResponse distanceTable = osrmAPI.generateDistanceTable(longLatList[0], longLatList[1]);
+        populateDistanceTable(locationList, distanceTable);
+
+        VehicleRoutePlan problem = new VehicleRoutePlan(
+            "Route plan for " + companyId + "on" + LocalDate.now().toString(),
+            timeBound[0],
+            timeBound[1],
+            plannedVehicles,
+            visits
+        );
+
+        
+
+        SolverJob<VehicleRoutePlan> job = solverManager.solve(UUID.randomUUID(), problem);
+        try {
+            // Use the returned plan: Timefold solves a copy, so `problem` itself stays unsolved
+            VehicleRoutePlan solved = job.getFinalBestSolution();
+            System.out.println(solved);
+            return PlanResponse.from(solved);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Solving was interrupted", e);
+        } catch (ExecutionException e) {
+            // Something threw inside the solver, e.g. a constraint or the arrival time calculation
+            throw new IllegalStateException("Solving failed", e.getCause());
+        }
+
+    }
+    private static void populateDistanceTable(List<Location> locations, OsrmTableResponse distanceTableResponse){
+        for (int i = 0; i < locations.size(); i++){
+            Map<Location, Long> locationMap = new HashMap<>();
+            for (int j = 0; j < locations.size(); j++){
+                Double seconds = distanceTableResponse.durations()[i][j];
+                locationMap.put(locations.get(j), seconds == null ? Long.MAX_VALUE / 4 : Math.round(seconds));
+
+            }
+            locations.get(i).setDrivingTimeInSeconds(locationMap);
+        }
+    }
+
+    private static Double[][] getLongLatLists(List<Location> locations){
+        List<Double> longitudeList = new ArrayList<Double>();
+        List<Double> latitudeList = new ArrayList<Double>();
+        for (Location loc : locations){
+            longitudeList.add(loc.getLongitude());
+            latitudeList.add(loc.getLattitude());
+        }
+        Double[][] result = {longitudeList.toArray(new Double[0]), latitudeList.toArray(new Double[0])};
+        return result;
+
+    }
+    private static List<Location> getLocationLists(List<PlannedVehicle> plannedVehicle, List<Visit> visits){
+        List<Location> locations = new ArrayList<Location>();
+        for (PlannedVehicle v : plannedVehicle){
+            locations.add(v.getHomeLocation());
+        }
+        for (Visit v : visits){
+            locations.add(v.getLocation());
+        }
+        return locations;
+    }
+
+    private static LocalDateTime[] getTimeBound(List<PlannedVehicle> plannedVehicles){
+        LocalDateTime minTime = plannedVehicles.get(0).getDepartureTime();
+        LocalDateTime maxTime = plannedVehicles.get(0).getShiftEndTime();
+        for (PlannedVehicle v : plannedVehicles){
+            minTime = minTime.isBefore(v.getDepartureTime()) ? minTime : v.getDepartureTime();
+            maxTime = maxTime.isAfter(v.getShiftEndTime()) ? maxTime : v.getShiftEndTime();
+        }
+        LocalDateTime[] result = {minTime, maxTime};
+        return result;
+    }
+
+    private static List<Visit> getVisits(List<Order> orders){
+        return orders.stream().map(PlanningService::orderToVisit).toList();
+    }
+
+    private static Visit orderToVisit(Order order){
+        Address address = order.getAddress();
+        return new Visit(
+            order.getId(),
+            address.getRawAddress(),
+            new Location(address.getLatitude(), address.getLongitude()),
+            order.getTotalWeightKg().setScale(0, RoundingMode.CEILING).longValue(),
+            order.getWindowStart() == null ? null : LocalDateTime.ofInstant(order.getWindowStart(), ZoneId.systemDefault()),
+            order.getWindowEnd()   == null ? null : LocalDateTime.ofInstant(order.getWindowEnd(),   ZoneId.systemDefault()),
+            order.isWindowStrict(),
+            Duration.ofMinutes(order.getServiceMinutes())
+        );
+    }
+
+    private static <T> List<Long> extractInvalidIds(List<T> foundObject, List<Long> idInput, Function<T, Long> getId){
+        Set<Long> validIds = foundObject.stream().map(getId).collect(Collectors.toSet());
+        return validIds.stream().filter(id -> !validIds.contains(id)).toList();
+    }
+
+    private static List<PlannedVehicle> getPlannedVehicles(List<VehicleShift> shifts){
+        return shifts.stream().map(shift -> toPlannedVehicle(shift)).toList();
+    }
+
+    private static PlannedVehicle toPlannedVehicle(VehicleShift shift){
+        Vehicle vehicle = shift.getVehicle();
+        Address vehicleHomeAddress = vehicle.getHomeDepot().getAddress();
+        Location vehicleHomeLocation = new Location(vehicleHomeAddress.getLatitude(), vehicleHomeAddress.getLongitude());
+        return new PlannedVehicle(
+            UUID.randomUUID().toString(),
+            vehicle.getCapacityKg().intValue(),
+            vehicleHomeLocation,
+            LocalDateTime.ofInstant(shift.getStartAt(), ZoneId.systemDefault()),
+            LocalDateTime.ofInstant(shift.getEndAt(), ZoneId.systemDefault()) 
+        );
+    }
+}

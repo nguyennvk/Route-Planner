@@ -40,5 +40,21 @@ public class PlannedVehicle {
         this.visits = new ArrayList<>();
     }
 
+    public Double[][] extractRouteLocations() {
+        int size = visits.size() + 2;   // the deliveries, plus home at both ends
+        Double[] latitudes = new Double[size];
+        Double[] longitudes = new Double[size];
+
+        latitudes[0] = latitudes[size - 1] = homeLocation.getLattitude();
+        longitudes[0] = longitudes[size - 1] = homeLocation.getLongitude();
+
+        for (int i = 0; i < visits.size(); i++) {
+            Location location = visits.get(i).getLocation();
+            latitudes[i + 1] = location.getLattitude();
+            longitudes[i + 1] = location.getLongitude();
+        }
+        return new Double[][] { latitudes, longitudes };
+    }
+
 
 }

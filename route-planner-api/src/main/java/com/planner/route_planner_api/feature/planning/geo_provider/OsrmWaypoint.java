@@ -1,4 +1,4 @@
-package com.planner.route_planner_api.feature.planning.distance_matrix_provider;
+package com.planner.route_planner_api.feature.planning.geo_provider;
 
 public record OsrmWaypoint(
         String name,

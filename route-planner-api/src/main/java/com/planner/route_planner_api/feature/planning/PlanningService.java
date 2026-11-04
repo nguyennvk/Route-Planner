@@ -28,10 +28,10 @@ import com.planner.route_planner_api.feature.companies.CompanyMember;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderRepository;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
-import com.planner.route_planner_api.feature.planning.distance_matrix_provider.OsrmAPI;
-import com.planner.route_planner_api.feature.planning.distance_matrix_provider.OsrmTableResponse;
 import com.planner.route_planner_api.feature.planning.dto.PlanRequest;
 import com.planner.route_planner_api.feature.planning.dto.PlanResponse;
+import com.planner.route_planner_api.feature.planning.geo_provider.OsrmAPI;
+import com.planner.route_planner_api.feature.planning.geo_provider.OsrmTableResponse;
 import com.planner.route_planner_api.feature.planning.optimizer.Location;
 import com.planner.route_planner_api.feature.planning.optimizer.PlannedVehicle;
 import com.planner.route_planner_api.feature.planning.optimizer.VehicleRoutePlan;
@@ -138,7 +138,7 @@ public class PlanningService {
         try {
             // Use the returned plan: Timefold solves a copy, so `problem` itself stays unsolved
             VehicleRoutePlan solved = job.getFinalBestSolution();
-            System.out.println(solved);
+            List<String> geometries = drawMapPolyline(solved.getVehicles());
             return PlanResponse.from(solved);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -149,6 +149,15 @@ public class PlanningService {
         }
 
     }
+
+    private List<String> drawMapPolyline(List<PlannedVehicle> vehicles){
+        List<String> geometries = new ArrayList<String>();
+        for (PlannedVehicle vehicle : vehicles){
+            geometries.add(osrmAPI.getRoute(vehicle));
+        }
+        return geometries;
+    }
+
     private static void populateDistanceTable(List<Location> locations, OsrmTableResponse distanceTableResponse){
         for (int i = 0; i < locations.size(); i++){
             Map<Location, Long> locationMap = new HashMap<>();

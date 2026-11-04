@@ -78,26 +78,6 @@ public class PlanningService {
     }
 
 
-    // Solves the hand-made mock (1 van, 2 visits) and waits for the answer.
-    // Blocks the request until the solver stops: 5 s without improvement, 30 s at most (application.properties)
-    public PlanResponse solveMock() {
-        VehicleRoutePlan problem = VehicleRoutePlanMock.create();
-
-        SolverJob<VehicleRoutePlan> job = solverManager.solve(UUID.randomUUID(), problem);
-        try {
-            // Use the returned plan: Timefold solves a copy, so `problem` itself stays unsolved
-            VehicleRoutePlan solved = job.getFinalBestSolution();
-            System.out.println(solved);
-            return PlanResponse.from(solved);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Solving was interrupted", e);
-        } catch (ExecutionException e) {
-            // Something threw inside the solver, e.g. a constraint or the arrival time calculation
-            throw new IllegalStateException("Solving failed", e.getCause());
-        }
-    }
-
     @Transactional 
     public PlanResponse solve(
         Long userId,
@@ -139,7 +119,7 @@ public class PlanningService {
             // Use the returned plan: Timefold solves a copy, so `problem` itself stays unsolved
             VehicleRoutePlan solved = job.getFinalBestSolution();
             List<String> geometries = drawMapPolyline(solved.getVehicles());
-            return PlanResponse.from(solved);
+            return PlanResponse.from(solved, geometries);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Solving was interrupted", e);

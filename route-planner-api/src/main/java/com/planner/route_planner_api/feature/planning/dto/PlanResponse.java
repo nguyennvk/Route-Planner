@@ -13,6 +13,7 @@ public record PlanResponse(
     String name,
     String score,                   // e.g. "0hard/0medium/-1037soft"
     List<RouteResponse> routes,
+    List<String> routesGeometries,
     List<Long> unassignedOrderIds   // orders that didn't fit on any route
 ) {
 
@@ -27,7 +28,7 @@ public record PlanResponse(
         long minutesLate
     ) {}
 
-    public static PlanResponse from(VehicleRoutePlan plan) {
+    public static PlanResponse from(VehicleRoutePlan plan, List<String> routesGeometries) {
         List<RouteResponse> routes = plan.getVehicles().stream()
             .map(PlanResponse::toRoute)
             .toList();
@@ -35,7 +36,7 @@ public record PlanResponse(
             .filter(visit -> visit.getVehicle() == null)
             .map(Visit::getOrderId)
             .toList();
-        return new PlanResponse(plan.getName(), String.valueOf(plan.getScore()), routes, unassigned);
+        return new PlanResponse(plan.getName(), String.valueOf(plan.getScore()), routes, routesGeometries, unassigned);
     }
 
     private static RouteResponse toRoute(PlannedVehicle vehicle) {

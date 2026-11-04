@@ -25,10 +25,6 @@ public class PlanningController {
         this.planningService = planningService;
     }
 
-    @PostMapping("/plan/mock/solve")
-    public PlanResponse solveMock() {
-        return planningService.solveMock();
-    }
 
     @PostMapping("/companies/{companyId}/plans")
     public PlanResponse solve(

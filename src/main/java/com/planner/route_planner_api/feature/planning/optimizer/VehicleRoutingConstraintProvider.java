@@ -23,9 +23,9 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
     // HARD: don't overload a vehicle; the penalty grows with how many kg over it is
     Constraint vehicleCapacity(ConstraintFactory factory) {
         return factory.forEach(PlannedVehicle.class)
-            .filter(vehicle -> totalWeightGrams(vehicle) > capacityGrams(vehicle))
+            .filter(vehicle -> totalWeightKg(vehicle) > vehicle.getCapacity())
             .penalize(HardMediumSoftScore.ONE_HARD,
-                vehicle -> (totalWeightGrams(vehicle) - capacityGrams(vehicle) + 999) / 1000)
+                vehicle -> totalWeightKg(vehicle) - vehicle.getCapacity())
             .asConstraint("vehicleCapacity");
     }
 
@@ -61,13 +61,8 @@ public class VehicleRoutingConstraintProvider implements ConstraintProvider {
             .asConstraint("drivingTime");
     }
 
-    private static long totalWeightGrams(PlannedVehicle vehicle) {
+    private static long totalWeightKg(PlannedVehicle vehicle) {
         return vehicle.getVisits().stream().mapToLong(Visit::getWeightKg).sum();
-    }
-
-    // PlannedVehicle.capacity is still in kg; visits are in grams
-    private static long capacityGrams(PlannedVehicle vehicle) {
-        return vehicle.getCapacity() * 1000L;
     }
 
     private static long totalDrivingSeconds(PlannedVehicle vehicle) {

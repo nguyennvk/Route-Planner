@@ -69,7 +69,8 @@ public class VehicleRoutePlan {
         List<PlannedVehicle> vehicleList = vehicles == null ? List.of() : vehicles;
         sb.append("  vehicles (").append(vehicleList.size()).append("):\n");
         for (PlannedVehicle vehicle : vehicleList) {
-            sb.append("    ").append(vehicle.getId())
+            sb.append("    shift ").append(vehicle.getShiftId())
+                .append("  vehicle ").append(vehicle.getVehicleId())
                 .append("  capacity ").append(vehicle.getCapacity()).append(" kg")
                 .append("  home ").append(format(vehicle.getHomeLocation()))
                 .append("  leaves ").append(vehicle.getDepartureTime()).append('\n');

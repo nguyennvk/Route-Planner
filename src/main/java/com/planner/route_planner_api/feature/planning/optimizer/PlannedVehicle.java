@@ -16,7 +16,8 @@ import lombok.Setter;
 @Setter 
 public class PlannedVehicle {
     @PlanningId
-    private String id;
+    private Long shiftId;
+    private Long vehicleId;
     private int capacity;
     private Location homeLocation;
     private LocalDateTime departureTime;
@@ -29,8 +30,9 @@ public class PlannedVehicle {
     public PlannedVehicle() {
     }
 
-    public PlannedVehicle(String id, int capacity, Location homeLocation, LocalDateTime departureTime, LocalDateTime shiftEndTime) {
-        this.id = id;
+    public PlannedVehicle(Long shiftId, Long vehicleId, int capacity, Location homeLocation, LocalDateTime departureTime, LocalDateTime shiftEndTime) {
+        this.shiftId = shiftId;
+        this.vehicleId = vehicleId;
         this.capacity = capacity;
         this.homeLocation = homeLocation;
         this.departureTime = departureTime;

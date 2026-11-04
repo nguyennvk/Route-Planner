@@ -226,7 +226,8 @@ public class PlanningService {
         Address vehicleHomeAddress = vehicle.getHomeDepot().getAddress();
         Location vehicleHomeLocation = new Location(vehicleHomeAddress.getLatitude(), vehicleHomeAddress.getLongitude());
         return new PlannedVehicle(
-            UUID.randomUUID().toString(),
+            shift.getId(),
+            vehicle.getId(),
             vehicle.getCapacityKg().intValue(),
             vehicleHomeLocation,
             LocalDateTime.ofInstant(shift.getStartAt(), ZoneId.systemDefault()),

@@ -25,11 +25,11 @@ public final class VehicleRoutePlanMock {
 
         LocalDateTime day = LocalDateTime.of(2026, 11, 2, 0, 0);
 
-        PlannedVehicle van = new PlannedVehicle("van-1", 500, depot, day.withHour(8), day.withHour(18));   // 500 kg, leaves 08:00
+        PlannedVehicle van = new PlannedVehicle(1L, 1L, 500, depot, day.withHour(8), day.withHour(18));   // 500 kg, leaves 08:00
 
-        Visit cityHallVisit = new Visit(1L, "Toronto City Hall", cityHall, 62_000,     // 62 kg
+        Visit cityHallVisit = new Visit(1L, "Toronto City Hall", cityHall, 62,         // 62 kg
             day.withHour(9), day.withHour(12), true, Duration.ofMinutes(5));           // strict 09:00–12:00
-        Visit agoVisit = new Visit(2L, "Art Gallery of Ontario", ago, 41_000,          // 41 kg
+        Visit agoVisit = new Visit(2L, "Art Gallery of Ontario", ago, 41,              // 41 kg
             day.withHour(13), day.withHour(16), false, Duration.ofMinutes(10));        // loose 13:00–16:00
 
         // Mutable lists: Timefold copies and changes them while solving

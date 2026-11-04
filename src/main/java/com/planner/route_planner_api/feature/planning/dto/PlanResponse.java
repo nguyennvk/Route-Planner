@@ -16,7 +16,7 @@ public record PlanResponse(
     List<Long> unassignedOrderIds   // orders that didn't fit on any route
 ) {
 
-    public record RouteResponse(String vehicleId, List<StopResponse> stops) {}
+    public record RouteResponse(Long shiftId, Long vehicleId, List<StopResponse> stops) {}
 
     public record StopResponse(
         int sequence,               // 0 = first stop after the depot
@@ -46,6 +46,6 @@ public record PlanResponse(
             stops.add(new StopResponse(i, visit.getOrderId(), visit.getName(),
                 visit.getArrivalTime(), visit.getDepartureTime(), visit.getMinutesLate()));
         }
-        return new RouteResponse(vehicle.getId(), stops);
+        return new RouteResponse(vehicle.getShiftId(), vehicle.getVehicleId(), stops);
     }
 }

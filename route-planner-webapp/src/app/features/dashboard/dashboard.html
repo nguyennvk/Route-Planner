@@ -1,0 +1,82 @@
+<div class="page">
+  <div class="page-head">
+    <div><h1>{{ dayLabel() }}</h1><p>{{ ctx.company()?.name }}</p></div>
+    <div class="page-actions">
+      <app-date-nav />
+      @if (ctx.isOwner()) {
+        <a class="btn btn-primary" [routerLink]="ctx.link('plan')"><app-icon name="route" /> Plan routes</a>
+      }
+    </div>
+  </div>
+
+  @if (data.hasValue()) {
+    <dl class="tiles">
+      @if (ctx.isOwner()) {
+        <div class="tile"><dt>Orders this day</dt><dd>{{ data.value().orders.length }}</dd></div>
+        <div class="tile"><dt>Waiting to be planned</dt><dd>{{ pendingCount() }}</dd></div>
+      }
+      <div class="tile"><dt>Shifts this day</dt><dd>{{ data.value().shifts.length }}</dd></div>
+      <div class="tile"><dt>Active vehicles</dt><dd>{{ data.value().vehicles }}</dd></div>
+    </dl>
+
+    <div class="columns" [class.single]="!ctx.isOwner()">
+      @if (ctx.isOwner()) {
+        <div class="col">
+          @if (!setupComplete()) {
+            <section class="card card-pad">
+              <h2 class="section-title">Before you can plan this day</h2>
+              <ol class="steps">
+                @for (step of setup(); track step.label; let i = $index) {
+                  <li [class.done]="step.done">
+                    <span class="marker">@if (step.done) { <app-icon name="check" [size]="18" /> } @else { {{ i + 1 }} }</span>
+                    <span class="step-text"><strong>{{ step.label }}</strong><span class="small muted">{{ step.detail }}</span></span>
+                    @if (!step.done) { <a class="btn btn-small" [routerLink]="ctx.link(step.path)">Open</a> }
+                  </li>
+                }
+              </ol>
+            </section>
+          }
+
+          @if (data.value().orders.length > 0) {
+            <section class="card card-pad">
+              <h2 class="section-title">Orders by status</h2>
+              <div class="bar" role="img" [attr.aria-label]="'Orders by status: see the list below'">
+                @for (part of split(); track part.status) {
+                  <span [style.flex-grow]="part.count" [style.background]="part.color" [title]="part.label + ': ' + part.count"></span>
+                }
+              </div>
+              <ul class="legend">
+                @for (part of split(); track part.status) {
+                  <li>
+                    <span class="swatch" [style.background]="part.color"></span>
+                    <span class="legend-label">{{ part.label }}</span>
+                    <span class="legend-value">{{ part.count }}</span>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+        </div>
+      }
+
+      <section class="card col-shifts">
+        <div class="card-head">
+          <h2 class="section-title">Shifts</h2>
+          <a class="small" [routerLink]="ctx.link('shifts')">All shifts</a>
+        </div>
+        <ul class="shift-list">
+          @for (shift of data.value().shifts; track shift.id) {
+            <li>
+              <span><strong>{{ shift.vehicleName }}</strong><span class="small muted">{{ shift.driverName || 'No driver yet' }}</span></span>
+              <span class="mono small nowrap">{{ time(shift.startAt) }} – {{ time(shift.endAt) }}</span>
+            </li>
+          } @empty {
+            <li class="muted">Nothing scheduled.</li>
+          }
+        </ul>
+      </section>
+    </div>
+  } @else {
+    <app-load-state [error]="data.error()" (retry)="data.reload()" />
+  }
+</div>

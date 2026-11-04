@@ -1,0 +1,156 @@
+<div class="sign hero">
+  <header class="nav">
+    <a routerLink="/" class="home"><app-brand [onDark]="true" /></a>
+    <nav aria-label="Page sections">
+      <a routerLink="/" fragment="run-sheet">Run sheets</a>
+      <a routerLink="/" fragment="how">How it works</a>
+      <a routerLink="/" fragment="rules">How it decides</a>
+    </nav>
+    <div class="nav-actions">
+      @if (session.loggedIn()) {
+        <a routerLink="/app" class="btn btn-accent">Open the app</a>
+      } @else {
+        <a routerLink="/login" class="login">Log in</a>
+        <a routerLink="/register" class="btn btn-accent">Get started</a>
+      }
+    </div>
+  </header>
+
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <h1>Turn today's orders into routes your drivers can run.</h1>
+      <p>Route Scheduler takes your orders, vehicles and shifts, and works out who delivers what, in which order, and when they'll arrive.</p>
+      <div class="cta-row">
+        <a [routerLink]="session.loggedIn() ? '/app' : '/register'" class="btn btn-accent btn-large">Start planning <app-icon name="arrow-right" [size]="18" /></a>
+        <a routerLink="/" fragment="how" class="btn btn-outline btn-large">See how it works</a>
+      </div>
+      @if (!session.loggedIn()) {
+        <p class="driver-link">Driving for a company? <a routerLink="/register" [queryParams]="{ role: 'driver' }">Sign up as a driver</a></p>
+      }
+    </div>
+
+    <svg class="hero-map" viewBox="0 0 640 560" role="img" aria-label="Illustration: scattered delivery stops being joined into three routes from one depot.">
+      <g class="streets" fill="none">
+        <path d="M0 80H640M0 140H640M0 220H640M0 300H640M0 400H640M0 480H640M60 0V560M120 0V560M240 0V560M320 0V560M460 0V560M540 0V560M600 0V560" />
+        <path d="M0 380 380 0M260 560 640 180" />
+      </g>
+
+      <path class="route r1" pathLength="1" d="M320 300V220L240 140H120L60 80" />
+      <path class="route r2" pathLength="1" d="M320 300H460L540 220V100" />
+      <path class="route r3" pathLength="1" d="M320 300V400L240 480H100" />
+
+      <g class="stops">
+        <circle cx="240" cy="140" r="9" /><circle cx="120" cy="140" r="9" /><circle cx="60" cy="80" r="9" />
+        <circle cx="460" cy="300" r="9" /><circle cx="540" cy="220" r="9" /><circle cx="540" cy="100" r="9" />
+        <circle cx="320" cy="400" r="9" /><circle cx="240" cy="480" r="9" /><circle cx="100" cy="480" r="9" />
+      </g>
+
+      <g class="times">
+        <text x="254" y="128">08:34</text><text x="96" y="172">09:02</text><text x="36" y="58">09:41</text>
+        <text x="444" y="334">08:22</text><text x="556" y="226">08:51</text><text x="518" y="78">09:27</text>
+        <text x="336" y="406">08:19</text><text x="256" y="506">08:48</text><text x="76" y="514">09:30</text>
+      </g>
+
+      <rect class="depot" x="304" y="284" width="32" height="32" rx="6" />
+    </svg>
+  </div>
+</div>
+
+<main>
+  <section id="run-sheet" class="section run-sheet">
+    <div class="section-copy">
+      <h2>A run sheet for every vehicle</h2>
+      <p>Each driver gets their stops in order, with the time to arrive at each one and how much of the vehicle's limit is used.</p>
+      <p>An order that can't fit isn't dropped quietly. It's listed on its own, so you can add a shift or move it to another day.</p>
+    </div>
+
+    <figure class="sheet">
+      <figcaption>Example output with sample data</figcaption>
+      <div class="sheet-card">
+        <header class="sheet-head">
+          <span class="sheet-swatch"></span>
+          <div><strong>Van 1</strong><span>Morning shift, 4 stops</span></div>
+          <div class="sheet-load"><span><b>244</b> of 400 kg</span><span class="meter"><span></span></span></div>
+        </header>
+        <ol class="sheet-stops">
+          @for (stop of stops; track stop.name; let i = $index) {
+            <li>
+              <span class="seq">{{ i + 1 }}</span>
+              <span class="time">{{ stop.time }}</span>
+              <span class="who"><strong>{{ stop.name }}</strong><span>{{ stop.window }}@if (stop.strict) {, strict}</span></span>
+              <span class="kg">{{ stop.kg }} kg</span>
+            </li>
+          }
+        </ol>
+        <footer class="sheet-foot"><app-icon name="warning" /> 1 order didn't fit on any route: Lakeview Clinic, 620 kg</footer>
+      </div>
+    </figure>
+  </section>
+
+  <section id="how" class="section how">
+    <h2>Four stops from order list to routes</h2>
+    <ol class="line">
+      @for (step of steps; track step.title; let i = $index) {
+        <li>
+          <span class="node">{{ i + 1 }}</span>
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.text }}</p>
+        </li>
+      }
+    </ol>
+  </section>
+
+  <section id="rules" class="section rules">
+    <div class="rules-head">
+      <h2>It decides in a fixed order of priority</h2>
+      <p>A shorter route never wins by overloading a van or missing a promise. Each level only counts once the one above it is settled.</p>
+    </div>
+    <div>
+    <ol class="priorities">
+      <li>
+        <span class="tier">First</span>
+        <div>
+          <h3>Keep the hard rules</h3>
+          <p>No vehicle goes over its weight limit. Orders marked as strict arrive inside their delivery window. If a plan ever can't meet these, the screen tells you plainly.</p>
+        </div>
+      </li>
+      <li>
+        <span class="tier">Then</span>
+        <div>
+          <h3>Deliver as many orders as possible</h3>
+          <p>Leaving an order behind costs more than any amount of extra driving.</p>
+        </div>
+      </li>
+      <li>
+        <span class="tier">Finally</span>
+        <div>
+          <h3>Cut the cost of the day</h3>
+          <p>Less total driving, measured with real road travel times. On a flexible window, a minute late counts the same as five minutes behind the wheel.</p>
+        </div>
+      </li>
+    </ol>
+    <p class="rules-note">The search stops after 5 seconds with no improvement, and after 30 seconds at most.</p>
+    </div>
+  </section>
+
+  <section class="section details" aria-label="More details">
+    @for (detail of details; track detail.title) {
+      <div class="detail">
+        <app-icon [name]="detail.icon" [size]="22" />
+        <h3>{{ detail.title }}</h3>
+        <p>{{ detail.text }}</p>
+      </div>
+    }
+  </section>
+
+  <section class="sign closing">
+    <h2>Plan your next delivery day.</h2>
+    <p>Create your company, add your fleet and orders, and solve your first routes.</p>
+    <a [routerLink]="session.loggedIn() ? '/app' : '/register'" class="btn btn-accent btn-large">{{ session.loggedIn() ? 'Open the app' : 'Create an account' }} <app-icon name="arrow-right" [size]="18" /></a>
+  </section>
+</main>
+
+<footer class="foot">
+  <app-brand />
+  <p>Travel times from OSRM. Map data © OpenStreetMap contributors.</p>
+</footer>

@@ -1,0 +1,80 @@
+<div class="page">
+  <div class="page-head">
+    <div><h1>Shifts</h1><p>{{ dayLabel() }}, in {{ ctx.zone() }}. A shift puts a vehicle on the road and makes it available to the planner.</p></div>
+    <div class="page-actions">
+      <app-date-nav />
+      @if (ctx.isOwner()) {
+        <button type="button" class="btn btn-primary" [disabled]="vehicles().length === 0" (click)="openNew()"><app-icon name="plus" /> New shift</button>
+      }
+    </div>
+  </div>
+
+  @if (shifts.hasValue()) {
+    @if (shifts.value().length === 0) {
+      <div class="card empty">
+        <h2>No shifts on this day</h2>
+        @if (lookups.hasValue() && vehicles().length === 0) {
+          <p>Shifts need an active vehicle. <a [routerLink]="ctx.link('fleet')">Set up your fleet</a> first.</p>
+        } @else if (ctx.isOwner()) {
+          <p>Add at least one shift to plan routes for this day.</p>
+          <button type="button" class="btn btn-primary" (click)="openNew()"><app-icon name="plus" /> New shift</button>
+        }
+      </div>
+    } @else {
+      <div class="table-wrap"><table class="data">
+        <thead><tr>
+          <th>Vehicle</th><th>Driver</th><th>Hours</th>
+          <th class="timeline-cell"><div class="scale small" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div><span class="visually-hidden">Position in the day</span></th>
+          @if (ctx.isOwner()) { <th><span class="visually-hidden">Actions</span></th> }
+        </tr></thead>
+        <tbody>
+          @for (shift of shifts.value(); track shift.id) {
+            <tr>
+              <td>{{ shift.vehicleName }}</td>
+              <td>@if (shift.driverName) { {{ shift.driverName }} } @else { <span class="badge badge-warn">No driver</span> }</td>
+              <td class="mono nowrap">{{ time(shift.startAt) }} – {{ time(shift.endAt) }}</td>
+              <td class="timeline-cell"><div class="timeline" aria-hidden="true"><div class="bar" [style.left]="bar(shift).left" [style.width]="bar(shift).width"></div></div></td>
+              @if (ctx.isOwner()) {
+                <td class="row-actions">
+                  <button type="button" class="btn btn-small" (click)="openEdit(shift)"><app-icon name="pencil" /> Edit</button>
+                  <button type="button" class="btn btn-small btn-danger" aria-label="Delete shift" (click)="openDelete(shift)"><app-icon name="trash" /></button>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table></div>
+    }
+  } @else {
+    <app-load-state [error]="shifts.error()" (retry)="shifts.reload()" />
+  }
+</div>
+
+<app-modal [open]="dialogOpen()" [heading]="editing() ? 'Edit shift' : 'New shift'" (closed)="dialogOpen.set(false)">
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    @if (runner.error()) { <div class="banner banner-error" role="alert" style="margin-bottom:12px">{{ runner.error() }}</div> }
+    <div class="form-grid">
+      <app-field class="span-2" label="Vehicle" [control]="form.controls.vehicleId">
+        <select class="input" formControlName="vehicleId">
+          @for (vehicle of vehicles(); track vehicle.id) { <option [ngValue]="vehicle.id">{{ vehicle.name }}</option> }
+          @if (editing(); as shift) { @if (!vehicles().some(hasId(shift.vehicleId))) { <option [ngValue]="shift.vehicleId">{{ shift.vehicleName }}</option> } }
+        </select>
+      </app-field>
+      <app-field class="span-2" label="Driver" [optional]="true" [hint]="editing()?.driverUserId ? 'A driver can be changed here but not removed yet' : ''" [control]="form.controls.driverUserId">
+        <select class="input" formControlName="driverUserId">
+          <option [ngValue]="null">No driver yet</option>
+          @for (driver of drivers(); track driver.userId) { <option [ngValue]="driver.userId">{{ driver.fullName }} ({{ driver.role }})</option> }
+        </select>
+      </app-field>
+      <app-field label="Starts" [hint]="'In ' + ctx.zone()" [control]="form.controls.startAt"><input class="input" type="datetime-local" formControlName="startAt" /></app-field>
+      <app-field label="Ends" [control]="form.controls.endAt"><input class="input" type="datetime-local" formControlName="endAt" /></app-field>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="dialogOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" [disabled]="runner.busy()">{{ runner.busy() ? 'Saving…' : 'Save shift' }}</button>
+    </div>
+  </form>
+</app-modal>
+
+<app-confirm [open]="deleting() !== null" heading="Delete this shift?" [message]="deleteMessage()" action="Delete shift"
+  [busy]="deleteRunner.busy()" [error]="deleteRunner.error()" (cancelled)="deleting.set(null)" (confirmed)="confirmDelete()" />

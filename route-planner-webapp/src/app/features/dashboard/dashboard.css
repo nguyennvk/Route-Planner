@@ -1,0 +1,32 @@
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 0 0 16px; }
+.tile { padding: 14px 16px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); }
+.tile dt { font-size: 13px; font-weight: 500; color: var(--ink-muted); }
+.tile dd { margin: 2px 0 0; font-size: 34px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+
+.columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.columns.single { grid-template-columns: minmax(0, 1fr); }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 1000px) { .columns { grid-template-columns: minmax(0, 1fr); } }
+
+.steps { margin-top: 10px; }
+.steps li { display: flex; align-items: center; gap: 12px; padding: 10px 0 8px; border-top: 1px solid var(--line); }
+.steps li:first-child { border-top: 0; }
+.marker { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-sunken); font-weight: 700; font-size: 13px; }
+.done .marker { background: var(--brand-soft); color: var(--brand); }
+.step-text { flex: 1; min-width: 0; }
+.step-text strong, .step-text .small { display: block; }
+.done .step-text strong { font-weight: 500; color: var(--ink-muted); }
+
+.bar { display: flex; gap: 2px; height: 12px; margin: 14px 0 12px; }
+.bar span { flex-basis: 0; min-width: 4px; }
+.bar span:first-child { border-radius: 4px 0 0 4px; }
+.bar span:last-child { border-radius: 0 4px 4px 0; }
+.bar span:only-child { border-radius: 4px; }
+.legend li { display: flex; align-items: center; gap: 8px; padding: 5px 0 3px; }
+.swatch { flex: none; width: 10px; height: 10px; border-radius: 2px; margin-top: -2px; }
+.legend-label { flex: 1; color: var(--ink-soft); }
+.legend-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.card-head { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 18px 10px; }
+.shift-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px 8px; border-top: 1px solid var(--line); }
+.shift-list strong, .shift-list .small.muted { display: block; }

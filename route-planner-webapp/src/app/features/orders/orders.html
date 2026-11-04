@@ -1,0 +1,133 @@
+<div class="page">
+  <div class="page-head">
+    <div><h1>Orders</h1><p>Only pending orders can be edited or sent to the planner.</p></div>
+    <div class="page-actions">
+      <app-date-nav />
+      <button type="button" class="btn btn-primary" (click)="openNew()"><app-icon name="plus" /> New order</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <select class="input" aria-label="Status" (change)="status.set($any($event.target).value || null); page.set(0)">
+      <option value="">All statuses</option>
+      @for (s of statuses; track s) { <option [value]="s">{{ statusLabel[s] }}</option> }
+    </select>
+    <select class="input" aria-label="Customer" (change)="customerFilter.set(+$any($event.target).value || null); page.set(0)">
+      <option value="">All customers</option>
+      @for (customer of customers(); track customer.id) { <option [value]="customer.id">{{ customer.name }}</option> }
+    </select>
+    <label class="check all-dates"><input type="checkbox" [checked]="allDates()" (change)="allDates.set($any($event.target).checked); page.set(0)" /> All dates, including orders with no window</label>
+  </div>
+
+  @if (orders.hasValue()) {
+    @if (orders.value().content.length === 0) {
+      <div class="card empty">
+        <h2>No orders found</h2>
+        <p>{{ allDates() ? 'Nothing matches these filters.' : 'Nothing is scheduled for this day with these filters. Orders with no delivery window only show under "All dates".' }}</p>
+        <button type="button" class="btn btn-primary" (click)="openNew()"><app-icon name="plus" /> New order</button>
+      </div>
+    } @else {
+      <div class="table-wrap"><table class="data wide">
+        <thead><tr><th>Order</th><th>Customer</th><th>Deliver to</th><th>Window</th><th class="num">Weight</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+        <tbody>
+          @for (order of orders.value().content; track order.id) {
+            <tr>
+              <td class="mono">#{{ order.id }}</td>
+              <td>{{ order.customer.name }}<span class="cell-sub">{{ order.items.length }} {{ order.items.length === 1 ? 'line' : 'lines' }}: {{ order.items[0]?.name }}@if (order.items.length > 1) { and more }</span></td>
+              <td>{{ order.address.normalizedAddress || order.address.rawAddress }}</td>
+              <td class="window">
+                {{ window(order) }}
+                @if (allDates() && order.windowStart) { <span class="cell-sub">{{ day(order) }}</span> }
+                @if (order.windowStrict) { <span class="cell-sub">Strict</span> }
+              </td>
+              <td class="num nowrap">{{ order.totalWeightKg | number: '1.0-1' }} kg</td>
+              <td><app-status-badge [status]="order.status" /></td>
+              <td class="row-actions">
+                @if (order.status === 'pending') {
+                  <button type="button" class="btn btn-small" (click)="openEdit(order)"><app-icon name="pencil" /> Edit</button>
+                  <button type="button" class="btn btn-small btn-danger" (click)="openCancel(order)">Cancel</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table></div>
+      <app-pager [page]="page()" [totalPages]="orders.value().totalPages" [total]="orders.value().totalElements" (pageChange)="page.set($event)" />
+    }
+  } @else {
+    <app-load-state [error]="orders.error()" (retry)="orders.reload()" />
+  }
+</div>
+
+<app-modal [open]="dialogOpen()" [wide]="true" [heading]="editing() ? 'Edit order #' + editing()?.id : 'New order'" (closed)="dialogOpen.set(false)">
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    @if (runner.error()) { <div class="banner banner-error" role="alert" style="margin-bottom:12px">{{ runner.error() }}</div> }
+
+    @if (lookups.hasValue() && (customers().length === 0 || items().length === 0)) {
+      <div class="banner banner-info" style="margin-bottom:12px">
+        Orders need a customer and at least one item.
+        <a [routerLink]="ctx.link(customers().length === 0 ? 'customers' : 'items')">Add {{ customers().length === 0 ? 'a customer' : 'an item' }} first</a>.
+      </div>
+    }
+
+    <div class="form-grid">
+      <app-field class="span-2" label="Customer" [control]="form.controls.customerId">
+        <select class="input" formControlName="customerId">
+          <option [ngValue]="null" disabled>Choose a customer</option>
+          @for (customer of customers(); track customer.id) { <option [ngValue]="customer.id">{{ customer.name }}</option> }
+        </select>
+      </app-field>
+
+      <div class="field span-2">
+        <span class="field-label">Deliver to</span>
+        @if (!address()) {
+          @if (editing(); as order) {
+            <p class="small muted">Now: {{ order.address.normalizedAddress || order.address.rawAddress }}. Search below to change it.</p>
+          } @else if (selectedCustomer()?.defaultAddress; as def) {
+            <p class="small muted">Customer's default: {{ def.normalizedAddress || def.rawAddress }}. Search below only to send this order elsewhere.</p>
+          }
+        }
+        <app-address-picker [choice]="address()" (choiceChange)="address.set($event)" />
+      </div>
+
+      <div class="field span-2" formArrayName="lines">
+        <div class="lines-head">
+          <span class="field-label">Items</span>
+          <span class="small muted">About {{ estimatedWeight() | number: '1.0-1' }} kg in total</span>
+        </div>
+        @for (line of lineControls(); track line; let i = $index) {
+          <div class="line" [formGroupName]="i">
+            <app-field label="Item" [control]="line.controls.itemId">
+              <select class="input" formControlName="itemId">
+                <option [ngValue]="null" disabled>Choose an item</option>
+                @for (item of items(); track item.id) { <option [ngValue]="item.id">{{ item.name }} ({{ item.weightKg }} kg)</option> }
+              </select>
+            </app-field>
+            <app-field label="Quantity" [control]="line.controls.quantity"><input class="input" type="number" min="1" max="10000" formControlName="quantity" /></app-field>
+            <button type="button" class="btn btn-quiet btn-icon" style="margin-top:23px" aria-label="Remove line" [disabled]="lineControls().length === 1" (click)="removeLine(i)"><app-icon name="trash" /></button>
+          </div>
+        }
+        <div><button type="button" class="btn btn-small" (click)="addLine()"><app-icon name="plus" /> Add item</button></div>
+      </div>
+
+      <app-field label="Window opens" [optional]="true" [hint]="'In ' + ctx.zone()" [control]="form.controls.windowStart"><input class="input" type="datetime-local" formControlName="windowStart" /></app-field>
+      <app-field label="Window closes" [optional]="true" [control]="form.controls.windowEnd"><input class="input" type="datetime-local" formControlName="windowEnd" /></app-field>
+
+      <label class="check span-2">
+        <input type="checkbox" formControlName="windowStrict" />
+        <span>Strict window<span class="cell-sub">The planner won't plan a late arrival. Otherwise lateness is allowed but costly.</span></span>
+      </label>
+
+      <app-field label="Minutes at the stop" [control]="form.controls.serviceMinutes"><input class="input" type="number" min="0" max="480" formControlName="serviceMinutes" /></app-field>
+      <app-field class="span-2" label="Notes" [optional]="true" [control]="form.controls.notes"><textarea class="input" formControlName="notes" placeholder="Gate code, loading dock, who to ask for"></textarea></app-field>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="dialogOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" [disabled]="runner.busy()">{{ runner.busy() ? 'Saving…' : 'Save order' }}</button>
+    </div>
+  </form>
+</app-modal>
+
+<app-confirm [open]="cancelling() !== null" heading="Cancel this order?" [message]="cancelMessage()" action="Cancel order"
+  [busy]="cancelRunner.busy()" [error]="cancelRunner.error()" (cancelled)="cancelling.set(null)" (confirmed)="confirmCancel()" />

@@ -1,0 +1,172 @@
+<div class="page planner">
+  <div class="page-head">
+    <div><h1>Plan routes</h1><p>Choose who's working and what needs delivering. The solver decides who goes where and in which order.</p></div>
+    <div class="page-actions">
+      <app-date-nav />
+      <button type="button" class="btn btn-primary solve" [disabled]="!canSolve()" (click)="solve()">
+        <app-icon name="route" /> {{ solving() ? 'Solving…' : (saved() ? 'Solve again' : 'Solve routes') }}
+      </button>
+    </div>
+  </div>
+
+  @if (data.hasValue()) {
+    @if (solving()) {
+      <div class="banner banner-info solving" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <div><strong>Working on {{ selectedOrders().length }} orders across {{ selectedShifts().length }} shifts ({{ elapsed() }} s)</strong>
+          <span class="cell-sub">It stops after 5 seconds with no improvement, and after 30 seconds at most.</span></div>
+      </div>
+    }
+    @if (solveError()) { <div class="banner banner-error msg" role="alert"><app-icon name="alert" /><div>{{ solveError() }}</div></div> }
+
+    <div class="layout" [class.solved]="view() !== null">
+      <aside class="inputs">
+        <section class="card">
+          <div class="card-head">
+            <h2 class="section-title">Shifts <span class="count">{{ selectedShifts().length }}/{{ shifts().length }}</span></h2>
+          </div>
+          <ul class="pick-list">
+            @for (shift of shifts(); track shift.id) {
+              <li><label class="check pick">
+                <input type="checkbox" [checked]="!excludedShifts().has(shift.id)" (change)="toggle('shifts', shift.id, $any($event.target).checked)" />
+                <span class="pick-main"><strong>{{ shift.vehicleName }}</strong><span class="small muted">{{ shift.driverName || 'No driver yet' }}</span></span>
+                <span class="mono small nowrap">{{ time(shift.startAt) }}–{{ time(shift.endAt) }}</span>
+              </label></li>
+            } @empty {
+              <li class="none">No shifts on this day. <a [routerLink]="ctx.link('shifts')">Add one</a> to plan routes.</li>
+            }
+          </ul>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2 class="section-title">Pending orders <span class="count">{{ selectedOrders().length }}/{{ candidates().length }}</span></h2>
+            @if (candidates().length > 0) {
+              <button type="button" class="link-btn" (click)="setAllOrders(excludedOrders().size > 0)">{{ excludedOrders().size > 0 ? 'Select all' : 'Clear' }}</button>
+            }
+          </div>
+          <ul class="pick-list orders-list">
+            @for (order of candidates(); track order.id) {
+              <li><label class="check pick">
+                <input type="checkbox" [checked]="!excludedOrders().has(order.id)" (change)="toggle('orders', order.id, $any($event.target).checked)" />
+                <span class="pick-main"><strong>{{ order.customer.name }}</strong><span class="small muted">{{ order.address.normalizedAddress || order.address.rawAddress }}</span></span>
+                <span class="pick-side small">
+                  <span class="mono nowrap">{{ orderWindow(order.windowStart, order.windowEnd) }}</span>
+                  <span class="muted nowrap">{{ order.totalWeightKg | number: '1.0-1' }} kg@if (order.windowStrict) {, strict}</span>
+                </span>
+              </label></li>
+            } @empty {
+              <li class="none">No pending orders for this day. <a [routerLink]="ctx.link('orders')">Create one</a>.</li>
+            }
+          </ul>
+          @if (candidates().length > 0) {
+            <p class="total small muted">{{ selectedWeight() | number: '1.0-1' }} kg selected</p>
+          }
+        </section>
+      </aside>
+
+      <div class="results">
+        <app-route-map [routes]="mapRoutes()" [looseStops]="mapLoose()" [depots]="mapDepots()" [highlighted]="highlighted()" />
+
+        @if (view(); as plan) {
+          <p class="map-note small muted">Lines connect stops in visiting order; they aren't the driving route. Square markers are depots.</p>
+
+          <section class="summary" aria-label="Plan summary">
+            @if (plan.score && !plan.score.feasible) {
+              <div class="banner banner-error msg" role="alert"><app-icon name="warning" />
+                <div><strong>This plan breaks a hard rule.</strong> A vehicle is over its weight limit or a strict window is missed. Add shifts, remove orders, or solve again before using it.</div></div>
+            }
+            @if (plan.unassigned.length > 0) {
+              <div class="banner banner-warn msg" role="status"><app-icon name="warning" />
+                <div><strong>{{ plan.unassigned.length }} {{ plan.unassigned.length === 1 ? 'order' : 'orders' }} didn't fit on any route.</strong> {{ plan.unassigned.length === 1 ? "It's" : "They're" }} listed below.</div></div>
+            }
+
+            <dl class="tiles">
+              <div class="tile"><dt>Orders routed</dt><dd>{{ plan.assignedCount }}<span class="of"> / {{ plan.assignedCount + plan.unassigned.length }}</span></dd></div>
+              <div class="tile"><dt>Vehicles used</dt><dd>{{ plan.routes.length }}<span class="of"> / {{ plan.routes.length + plan.idleRoutes.length }}</span></dd></div>
+              <div class="tile"><dt>Late stops</dt><dd>{{ plan.lateCount }}</dd></div>
+              @if (plan.score) { <div class="tile"><dt>Cost</dt><dd class="cost">{{ softCost(plan.score.soft) }}</dd></div> }
+            </dl>
+
+            <details class="explain small">
+              <summary>What does the cost mean?</summary>
+              <p>Total driving time, plus lateness on flexible windows at 5 minutes of driving per minute late. Lower is better.</p>
+              <p>Raw solver score: <span class="mono">{{ saved()?.plan?.score }}</span>. The solver improves hard rules first, then how many orders are delivered, then this cost.</p>
+            </details>
+          </section>
+
+          <div class="routes">
+            @for (route of plan.routes; track route.shiftId) {
+              <article class="card route" (mouseenter)="highlighted.set(route.shiftId)" (mouseleave)="highlighted.set(null)" (focusin)="highlighted.set(route.shiftId)" (focusout)="highlighted.set(null)">
+                <header>
+                  <span class="route-swatch" [style.background]="route.fill"></span>
+                  <div class="route-title">
+                    <h3>{{ route.vehicleName }}</h3>
+                    <span class="small muted">{{ route.driverName || 'No driver yet' }}, {{ route.stops.length }} {{ route.stops.length === 1 ? 'stop' : 'stops' }}</span>
+                  </div>
+                  @if (route.capacityKg) {
+                    <div class="load" [class.over]="overloaded(route)">
+                      <span class="small"><span class="load-value">{{ route.usedKg | number: '1.0-0' }}</span> of {{ route.capacityKg | number: '1.0-0' }} kg ({{ route.loadShare | percent }})</span>
+                      <span class="meter" aria-hidden="true"><span [style.width]="meterWidth(route)"></span></span>
+                    </div>
+                  }
+                </header>
+                <div class="table-scroll">
+                  <table class="data stops">
+                    <thead><tr><th>#</th><th>Arrive</th><th>Leave</th><th>Customer</th><th>Window</th><th class="num">Weight</th></tr></thead>
+                    <tbody>
+                      @if (route.depot) {
+                        <tr class="depot-row"><td></td><td colspan="2"></td><td colspan="3" class="muted">Starts at {{ route.depot.name }}</td></tr>
+                      }
+                      @for (stop of route.stops; track stop.orderId) {
+                        <tr>
+                          <td><span class="seq" [style.background]="route.fill" [style.color]="route.ink">{{ stop.sequence + 1 }}</span></td>
+                          <td class="mono nowrap">{{ time(stop.arrival) }}</td>
+                          <td class="mono nowrap">{{ time(stop.departure) }}</td>
+                          <td>{{ stop.customerName }}<span class="cell-sub">{{ stop.address }}</span></td>
+                          <td class="nowrap">
+                            {{ orderWindow(stop.windowStart, stop.windowEnd) }}
+                            @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }
+                          </td>
+                          <td class="num nowrap">{{ stop.weightKg === null ? '–' : (stop.weightKg | number: '1.0-1') + ' kg' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            }
+
+            @if (plan.unassigned.length > 0) {
+              <article class="card route">
+                <header><div class="route-title"><h3>Not on any route</h3><span class="small muted">Add a shift or free up capacity, then solve again</span></div></header>
+                <ul class="pick-list">
+                  @for (entry of plan.unassigned; track entry.orderId) {
+                    <li class="unassigned">
+                      <span class="pick-main"><strong>{{ entry.customerName }}</strong><span class="small muted">{{ entry.address }}</span></span>
+                      @if (entry.weightKg !== null) { <span class="small nowrap">{{ entry.weightKg | number: '1.0-1' }} kg</span> }
+                    </li>
+                  }
+                </ul>
+              </article>
+            }
+
+            @if (plan.idleRoutes.length > 0) {
+              <p class="small muted">Not needed: @for (route of plan.idleRoutes; track route.shiftId; let last = $last) { {{ route.vehicleName }}{{ last ? '.' : ', ' }} }</p>
+            }
+          </div>
+
+          <div class="plan-foot small muted">
+            <app-icon name="info" />
+            <span>Solved {{ solvedAtLabel() }}. Plans aren't saved on the server yet, so this one lives in this browser only, and its orders stay pending.</span>
+            <button type="button" class="link-btn" (click)="discardPlan()">Discard</button>
+          </div>
+        } @else if (!solving()) {
+          <p class="map-note small muted">Each pin is a selected order; square markers are depots. Solve to turn them into routes.</p>
+        }
+      </div>
+    </div>
+  } @else {
+    <app-load-state [error]="data.error()" (retry)="data.reload()" />
+  }
+</div>

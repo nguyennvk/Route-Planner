@@ -1,0 +1,125 @@
+<div class="page">
+  <div class="page-head">
+    <div><h1>Fleet</h1><p>Vehicles start and finish each route at their home depot. The planner won't load one past its weight limit.</p></div>
+    @if (ctx.isOwner()) {
+      <button type="button" class="btn btn-primary" [disabled]="!hasDepots()" (click)="openVehicle(null)"><app-icon name="plus" /> New vehicle</button>
+    }
+  </div>
+
+  <div class="grid">
+    <section aria-labelledby="vehicles-heading">
+      <h2 id="vehicles-heading" class="visually-hidden">Vehicles</h2>
+      <div class="toolbar">
+        <select class="input" aria-label="Vehicle type" (change)="typeFilter.set($any($event.target).value || null)">
+          <option value="">All types</option>
+          @for (type of types; track type) { <option [value]="type">{{ type }}</option> }
+        </select>
+        <label class="check" style="align-self:center"><input type="checkbox" [checked]="showInactive()" (change)="showInactive.set($any($event.target).checked)" /> Show inactive</label>
+      </div>
+      @if (deactivateRunner.error()) { <div class="banner banner-error" role="alert" style="margin-bottom:12px">{{ deactivateRunner.error() }}</div> }
+
+      @if (vehicles.hasValue()) {
+        @if (vehicles.value().length === 0) {
+          <div class="card empty">
+            <h3>No vehicles here</h3>
+            <p>{{ hasDepots() ? 'Add a vehicle with its weight limit so it can take shifts.' : 'Add a depot first. Every vehicle needs a home base.' }}</p>
+          </div>
+        } @else {
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Vehicle</th><th>Type</th><th class="num">Capacity</th><th>Home depot</th>@if (ctx.isOwner()) { <th><span class="visually-hidden">Actions</span></th> }</tr></thead>
+            <tbody>
+              @for (vehicle of vehicles.value(); track vehicle.id) {
+                <tr>
+                  <td>{{ vehicle.name }} @if (!vehicle.active) { <span class="badge">Inactive</span> }</td>
+                  <td class="cap">{{ vehicle.type }}</td>
+                  <td class="num nowrap">{{ vehicle.capacityKg }} kg @if (vehicle.capacityM3) { <span class="cell-sub">{{ vehicle.capacityM3 }} m³</span> }</td>
+                  <td>{{ depotName(vehicle.homeDepotId) }}</td>
+                  @if (ctx.isOwner()) {
+                    <td class="row-actions">
+                      <button type="button" class="btn btn-small" (click)="openVehicle(vehicle)"><app-icon name="pencil" /> Edit</button>
+                      @if (vehicle.active) {
+                        <button type="button" class="btn btn-small btn-danger" (click)="deactivateRunner.reset(); deactivating.set(vehicle)">Deactivate</button>
+                      } @else {
+                        <button type="button" class="btn btn-small" (click)="reactivate(vehicle)">Reactivate</button>
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table></div>
+        }
+      } @else {
+        <app-load-state [error]="vehicles.error()" (retry)="vehicles.reload()" />
+      }
+    </section>
+
+    <section aria-labelledby="depots-heading">
+      <div class="side-head">
+        <h2 id="depots-heading" class="section-title">Depots</h2>
+        @if (ctx.isOwner()) { <button type="button" class="btn btn-small" (click)="openDepot()"><app-icon name="plus" /> New depot</button> }
+      </div>
+      @if (depots.hasValue()) {
+        <div class="card">
+          @for (depot of depots.value(); track depot.id) {
+            <div class="depot">
+              <strong>{{ depot.name }}</strong>
+              <span class="small muted">{{ depot.address.normalizedAddress || depot.address.rawAddress }}</span>
+            </div>
+          } @empty {
+            <div class="empty" style="padding:24px 16px"><p style="margin:0">No depots yet.</p></div>
+          }
+        </div>
+      } @else {
+        <app-load-state [error]="depots.error()" (retry)="depots.reload()" />
+      }
+    </section>
+  </div>
+</div>
+
+<app-modal [open]="vehicleOpen()" [heading]="editing() ? 'Edit vehicle' : 'New vehicle'" (closed)="vehicleOpen.set(false)">
+  <form [formGroup]="vehicleForm" (ngSubmit)="saveVehicle()" novalidate>
+    @if (vehicleRunner.error()) { <div class="banner banner-error" role="alert" style="margin-bottom:12px">{{ vehicleRunner.error() }}</div> }
+    <div class="form-grid">
+      <app-field class="span-2" label="Name" hint="Something drivers recognise, like a plate or fleet number" [control]="vehicleForm.controls.name"><input class="input" formControlName="name" /></app-field>
+      <app-field label="Type" [control]="vehicleForm.controls.type">
+        <select class="input cap" formControlName="type">
+          @for (type of types; track type) { <option [value]="type">{{ type }}</option> }
+        </select>
+      </app-field>
+      <app-field label="Home depot" [control]="vehicleForm.controls.homeDepotId">
+        <select class="input" formControlName="homeDepotId">
+          @if (depots.hasValue()) {
+            @for (depot of depots.value(); track depot.id) { <option [ngValue]="depot.id">{{ depot.name }}</option> }
+          }
+        </select>
+      </app-field>
+      <app-field label="Weight limit (kg)" [control]="vehicleForm.controls.capacityKg"><input class="input" type="number" step="0.01" min="0" formControlName="capacityKg" /></app-field>
+      <app-field label="Volume limit (m³)" [optional]="true" [control]="vehicleForm.controls.capacityM3" hint="Stored, not yet used by the planner"><input class="input" type="number" step="0.001" min="0" formControlName="capacityM3" /></app-field>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="vehicleOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" [disabled]="vehicleRunner.busy()">{{ vehicleRunner.busy() ? 'Saving…' : 'Save vehicle' }}</button>
+    </div>
+  </form>
+</app-modal>
+
+<app-confirm [open]="deactivating() !== null" heading="Deactivate vehicle?" [message]="deactivateMessage()" action="Deactivate"
+  [busy]="deactivateRunner.busy()" [error]="deactivateRunner.error()" (cancelled)="deactivating.set(null)" (confirmed)="deactivate()" />
+
+<app-modal [open]="depotOpen()" heading="New depot" (closed)="depotOpen.set(false)">
+  <form (submit)="$event.preventDefault(); saveDepot()" novalidate>
+    @if (depotRunner.error()) { <div class="banner banner-error" role="alert" style="margin-bottom:12px">{{ depotRunner.error() }}</div> }
+    <div class="form-grid">
+      <app-field class="span-2" label="Name" [control]="depotNameControl"><input class="input" [formControl]="depotNameControl" /></app-field>
+      <div class="field span-2">
+        <span class="field-label">Address</span>
+        @if (depotOpen()) { <app-address-picker [allowSaved]="false" [choice]="depotAddress()" (choiceChange)="depotAddress.set($event)" /> }
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn" (click)="depotOpen.set(false)">Cancel</button>
+      <button class="btn btn-primary" [disabled]="depotRunner.busy()">{{ depotRunner.busy() ? 'Saving…' : 'Save depot' }}</button>
+    </div>
+  </form>
+</app-modal>

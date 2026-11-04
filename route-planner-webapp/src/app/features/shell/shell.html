@@ -1,0 +1,61 @@
+<div class="shell" [class.menu-open]="menuOpen()">
+  <header class="topbar">
+    <button type="button" class="btn btn-quiet btn-icon menu-btn" aria-label="Open menu" (click)="menuOpen.set(true)"><app-icon name="menu" [size]="20" /></button>
+    <app-brand [onDark]="true" />
+  </header>
+
+  <div class="scrim" (click)="menuOpen.set(false)"></div>
+
+  <aside class="sidebar">
+    <a routerLink="/" class="brand-link"><app-brand [onDark]="true" /></a>
+
+    <label class="company-switch">
+      <span class="visually-hidden">Company</span>
+      <select [value]="companyId()" (change)="switchCompany($any($event.target).value)">
+        @if (companies.hasValue()) {
+          @for (company of companies.value(); track company.id) {
+            <option [value]="company.id" [selected]="company.id === +companyId()">{{ company.name }}</option>
+          }
+        }
+        <option value="all">All companies…</option>
+      </select>
+    </label>
+
+    <nav aria-label="Main">
+      @for (group of nav(); track group.heading) {
+        <div class="nav-group">
+          <h2>{{ group.heading }}</h2>
+          @for (link of group.links; track link.path) {
+            <a [routerLink]="link.path" routerLinkActive="active" (click)="menuOpen.set(false)">
+              <app-icon [name]="link.icon" [size]="17" />
+              {{ link.label }}
+            </a>
+          }
+        </div>
+      }
+    </nav>
+
+    <div class="user">
+      @if (me.hasValue()) {
+        <div class="user-name">
+          <strong>{{ me.value().fullName }}</strong>
+          <span>{{ me.value().email }}</span>
+        </div>
+      }
+      <button type="button" class="logout" aria-label="Log out" title="Log out" (click)="logout()"><app-icon name="logout" /></button>
+    </div>
+  </aside>
+
+  <main>
+    @if (current.error()) {
+      <div class="page">
+        <app-load-state [error]="current.error()" (retry)="current.reload()" />
+        <p style="margin-top:14px"><a routerLink="/app">Back to your companies</a></p>
+      </div>
+    } @else if (ready()) {
+      <router-outlet />
+    } @else {
+      <div class="page"><app-load-state /></div>
+    }
+  </main>
+</div>

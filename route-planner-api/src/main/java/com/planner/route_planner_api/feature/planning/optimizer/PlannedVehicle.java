@@ -26,6 +26,7 @@ public class PlannedVehicle {
     // What the solver decides: which visits this vehicle does, in driving order
     @PlanningListVariable(allowsUnassignedValues = true)
     private List<Visit> visits;
+    private String geometry;
 
     public PlannedVehicle() {
     }

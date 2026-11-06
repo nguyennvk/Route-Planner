@@ -13,11 +13,10 @@ public record PlanResponse(
     String name,
     String score,                   // e.g. "0hard/0medium/-1037soft"
     List<RouteResponse> routes,
-    List<String> routesGeometries,
     List<Long> unassignedOrderIds   // orders that didn't fit on any route
 ) {
 
-    public record RouteResponse(Long shiftId, Long vehicleId, List<StopResponse> stops) {}
+    public record RouteResponse(Long shiftId, Long vehicleId, List<StopResponse> stops, String geometry) {}
 
     public record StopResponse(
         int sequence,               // 0 = first stop after the depot
@@ -28,7 +27,7 @@ public record PlanResponse(
         long minutesLate
     ) {}
 
-    public static PlanResponse from(VehicleRoutePlan plan, List<String> routesGeometries) {
+    public static PlanResponse from(VehicleRoutePlan plan) {
         List<RouteResponse> routes = plan.getVehicles().stream()
             .map(PlanResponse::toRoute)
             .toList();
@@ -36,7 +35,7 @@ public record PlanResponse(
             .filter(visit -> visit.getVehicle() == null)
             .map(Visit::getOrderId)
             .toList();
-        return new PlanResponse(plan.getName(), String.valueOf(plan.getScore()), routes, routesGeometries, unassigned);
+        return new PlanResponse(plan.getName(), String.valueOf(plan.getScore()), routes, unassigned);
     }
 
     private static RouteResponse toRoute(PlannedVehicle vehicle) {
@@ -47,6 +46,6 @@ public record PlanResponse(
             stops.add(new StopResponse(i, visit.getOrderId(), visit.getName(),
                 visit.getArrivalTime(), visit.getDepartureTime(), visit.getMinutesLate()));
         }
-        return new RouteResponse(vehicle.getShiftId(), vehicle.getVehicleId(), stops);
+        return new RouteResponse(vehicle.getShiftId(), vehicle.getVehicleId(), stops, vehicle.getGeometry());
     }
 }

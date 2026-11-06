@@ -112,14 +112,12 @@ public class PlanningService {
             visits
         );
 
-        
-
         SolverJob<VehicleRoutePlan> job = solverManager.solve(UUID.randomUUID(), problem);
         try {
             // Use the returned plan: Timefold solves a copy, so `problem` itself stays unsolved
             VehicleRoutePlan solved = job.getFinalBestSolution();
-            List<String> geometries = drawMapPolyline(solved.getVehicles());
-            return PlanResponse.from(solved, geometries);
+            drawMapPolyline(solved.getVehicles());
+            return PlanResponse.from(solved);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Solving was interrupted", e);
@@ -130,12 +128,10 @@ public class PlanningService {
 
     }
 
-    private List<String> drawMapPolyline(List<PlannedVehicle> vehicles){
-        List<String> geometries = new ArrayList<String>();
+    private void drawMapPolyline(List<PlannedVehicle> vehicles){
         for (PlannedVehicle vehicle : vehicles){
-            geometries.add(osrmAPI.getRoute(vehicle));
+            vehicle.setGeometry(osrmAPI.getRoute(vehicle));
         }
-        return geometries;
     }
 
     private static void populateDistanceTable(List<Location> locations, OsrmTableResponse distanceTableResponse){

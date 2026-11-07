@@ -213,6 +213,9 @@ export interface PlanRoute {
   shiftId: number;
   vehicleId: number;
   stops: PlanStop[];
+  // OSRM encoded polyline (precision 5) of the road path, depot to depot. Missing on plans saved before
+  // the API sent it, and null when OSRM couldn't route that vehicle.
+  geometry?: string | null;
 }
 
 export interface Plan {

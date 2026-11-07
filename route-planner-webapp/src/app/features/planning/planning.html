@@ -69,7 +69,7 @@
         <app-route-map [routes]="mapRoutes()" [looseStops]="mapLoose()" [depots]="mapDepots()" [highlighted]="highlighted()" />
 
         @if (view(); as plan) {
-          <p class="map-note small muted">Lines connect stops in visiting order; they aren't the driving route. Square markers are depots.</p>
+          <p class="map-note small muted">Lines follow the roads in visiting order. A straight line means no road route was available for that vehicle. Square markers are depots.</p>
 
           <section class="summary" aria-label="Plan summary">
             @if (plan.score && !plan.score.feasible) {

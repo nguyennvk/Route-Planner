@@ -86,12 +86,13 @@ public class OsrmAPI {
                 .body(OsrmRouteResponse.class);      // Jackson turns the JSON into your record
         } catch (RestClientException e) {
             // OSRM rejected the request, is down, or timed out
-            log.warn("OSRM table request failed", e);
+            log.warn("OSRM route request failed", e);
             throw new ServiceUnavailableException("Precise route presentation is unavailable right now. Try again later.");
         }
 
         // OSRM reports problems in "code" too; "Ok" is the only success value
-        if (response == null || !"Ok".equals(response.code())) {
+        if (response == null || !"Ok".equals(response.code())
+                || response.routes() == null || response.routes().isEmpty()) {
             throw new ServiceUnavailableException("Precise route presentation is unavailable right now. Try again later.");
         }
         return response.routes().get(0).geometry();

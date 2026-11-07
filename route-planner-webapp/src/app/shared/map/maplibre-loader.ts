@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
 
 // OpenFreeMap: OpenStreetMap vector tiles, free and with no API key
-export const MAP_STYLE: string | StyleSpecification = 'https://tiles.openfreemap.org/styles/positron';
+export const MAP_STYLE: string | StyleSpecification = 'https://tiles.openfreemap.org/styles/liberty';
 
 // Toronto, used until the map has real points to fit
 export const DEFAULT_CENTER: [number, number] = [-79.38, 43.65];

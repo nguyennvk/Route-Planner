@@ -1,16 +1,16 @@
-import { Component, DestroyRef, ElementRef, afterNextRender, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, afterNextRender, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import type { Marker, Popup } from 'maplibre-gl';
 import { DEFAULT_CENTER, MAP_STYLE, MapLibreMap, loadMapLibre } from './maplibre-loader';
 
 export interface MapStop { label: string; title: string; detail: string; latitude: number; longitude: number; }
-export interface MapRoute { id: number; fill: string; ink: string; start: [number, number] | null; stops: MapStop[]; }
+export interface MapRoute { id: number; fill: string; ink: string; start: [number, number] | null; stops: MapStop[]; path: [number, number][] | null; }
 export interface MapDepot { name: string; latitude: number; longitude: number; }
 
 type Maplibre = typeof import('maplibre-gl');
 const LINE_SOURCE = 'route-lines';
 
-// Draws routes, loose stops and depots. The API has no road geometry, so the lines join stops in visiting
-// order as straight segments. They show the sequence, not the road the driver takes.
+// Draws routes, loose stops and depots. A route with a road path follows the roads; one without (an older
+// saved plan, or OSRM couldn't route it) joins its stops in visiting order with straight segments.
 @Component({
   selector: 'app-route-map',
   template: `
@@ -116,7 +116,8 @@ export class RouteMap {
         addMarker(stopElement(stop, route.fill, route.ink, false), route.id, stop.longitude, stop.latitude, stop);
       }
     }
-    this.setLines(routes, this.highlighted());
+    // untracked: reading highlighted() here would make the draw effect rebuild every marker on each hover
+    this.setLines(routes, untracked(this.highlighted));
 
     // Only move the camera when the set of points changes, not on every redraw
     const fitKey = bounds.isEmpty() ? '' : bounds.toArray().flat().join();
@@ -132,7 +133,7 @@ export class RouteMap {
       type: 'FeatureCollection',
       features: routes.map((route) => {
         const stops = route.stops.map((stop): [number, number] => [stop.longitude, stop.latitude]);
-        const coordinates = route.start ? [route.start, ...stops, route.start] : stops;
+        const coordinates = route.path ?? (route.start ? [route.start, ...stops, route.start] : stops);
         return {
           type: 'Feature',
           properties: { color: route.fill, opacity: highlighted === null || highlighted === route.id ? 0.95 : 0.15 },

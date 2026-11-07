@@ -1,3 +1,4 @@
+import { decode } from '@googlemaps/polyline-codec';
 import { Depot, Order, Plan, Shift, Vehicle } from '../../core/models';
 import { serverLocalToInstant } from '../../core/time';
 
@@ -57,6 +58,7 @@ export interface RouteView {
   usedKg: number;
   capacityKg: number | null;
   loadShare: number | null;
+  path: [number, number][] | null;  // road path as [lng, lat], or null to join stops with straight lines
 }
 
 export interface PlanView {
@@ -121,6 +123,7 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
       usedKg,
       capacityKg,
       loadShare: capacityKg ? usedKg / capacityKg : null,
+      path: route.geometry ? decodePath(route.geometry) : null,
     };
   });
 
@@ -141,6 +144,12 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
     assignedCount: routes.reduce((sum, route) => sum + route.stops.length, 0),
     lateCount: routes.reduce((sum, route) => sum + route.stops.filter((stop) => stop.minutesLate > 0).length, 0),
   };
+}
+
+// OSRM sends geometries=polyline, which is precision 5. The decoder returns [lat, lng] and the map wants [lng, lat].
+// Decoded here, inside the view's computed, so hovering a route doesn't decode every path again.
+export function decodePath(polyline: string): [number, number][] {
+  return decode(polyline, 5).map(([lat, lng]): [number, number] => [lng, lat]);
 }
 
 // Soft score is driving seconds plus lateness at 5 minutes of driving per late minute, so it reads as time

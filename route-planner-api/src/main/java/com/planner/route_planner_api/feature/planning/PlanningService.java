@@ -5,26 +5,24 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.planner.route_planner_api.common.error.ServiceUnavailableException;
 import com.planner.route_planner_api.feature.addresses.Address;
 import com.planner.route_planner_api.feature.addresses.AddressRepository;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
-import com.planner.route_planner_api.feature.companies.CompanyMember;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderRepository;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
@@ -35,7 +33,6 @@ import com.planner.route_planner_api.feature.planning.geo_provider.OsrmTableResp
 import com.planner.route_planner_api.feature.planning.optimizer.Location;
 import com.planner.route_planner_api.feature.planning.optimizer.PlannedVehicle;
 import com.planner.route_planner_api.feature.planning.optimizer.VehicleRoutePlan;
-import com.planner.route_planner_api.feature.planning.optimizer.VehicleRoutePlanMock;
 import com.planner.route_planner_api.feature.planning.optimizer.Visit;
 import com.planner.route_planner_api.feature.vehicles.Vehicle;
 import com.planner.route_planner_api.feature.vehicles.VehicleRepository;
@@ -44,7 +41,6 @@ import com.planner.route_planner_api.feature.vehicles.VehicleShiftRepository;
 
 import ai.timefold.solver.core.api.solver.SolverJob;
 import ai.timefold.solver.core.api.solver.SolverManager;
-import jakarta.persistence.Entity;
 import jakarta.transaction.Transactional;
 
 @Service
@@ -58,6 +54,9 @@ public class PlanningService {
     private final VehicleShiftRepository vehicleShiftRepository;
     private final OrderRepository orderRepository;
     private final OsrmAPI osrmAPI;
+
+    private static final Logger log = LoggerFactory.getLogger(PlanningService.class);
+
 
     public PlanningService(
         SolverManager<VehicleRoutePlan> solverManager,
@@ -130,7 +129,13 @@ public class PlanningService {
 
     private void drawMapPolyline(List<PlannedVehicle> vehicles){
         for (PlannedVehicle vehicle : vehicles){
-            vehicle.setGeometry(osrmAPI.getRoute(vehicle));
+            if (vehicle.getVisits().isEmpty()) continue;
+            try {
+                vehicle.setGeometry(osrmAPI.getRoute(vehicle));
+            } catch (ServiceUnavailableException ex) {
+                log.warn("No road geometry for shift {}", vehicle.getShiftId(), ex);
+            }
+            
         }
     }
 

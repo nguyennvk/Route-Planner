@@ -102,6 +102,7 @@ export class Planning {
       latitude: stop.latitude!,
       longitude: stop.longitude!,
     })),
+    path: route.path,
   })));
 
   protected readonly mapLoose = computed((): MapStop[] => {

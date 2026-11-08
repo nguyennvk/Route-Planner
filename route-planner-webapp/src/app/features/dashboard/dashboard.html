@@ -5,6 +5,8 @@
       <app-date-nav />
       @if (ctx.isOwner()) {
         <a class="btn btn-primary" [routerLink]="ctx.link('plan')"><app-icon name="route" /> Plan routes</a>
+      } @else {
+        <a class="btn btn-primary" [routerLink]="ctx.link('my-routes')"><app-icon name="navigation" /> My routes</a>
       }
     </div>
   </div>

@@ -15,6 +15,8 @@ interface NavLink { path: string; label: string; icon: IconName; ownerOnly?: boo
 const NAV: { heading: string; links: NavLink[] }[] = [
   { heading: 'Plan', links: [
     { path: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+    // Everyone: an owner who also drives a shift gets routes too
+    { path: 'my-routes', label: 'My routes', icon: 'navigation' },
     { path: 'plan', label: 'Plan routes', icon: 'route', ownerOnly: true },
   ] },
   { heading: 'Operations', links: [

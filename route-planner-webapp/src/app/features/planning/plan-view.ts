@@ -1,6 +1,6 @@
 import { decode } from '@googlemaps/polyline-codec';
 import { Depot, Order, Plan, Shift, Vehicle } from '../../core/models';
-import { serverLocalToInstant } from '../../core/time';
+import { companyLocalToInstant } from '../../core/time';
 
 // Fixed order, validated with the dataviz palette checker against the white surface. Three of these are
 // under 3:1 contrast, so every route also has a name in the legend and numbered stop markers.
@@ -24,8 +24,8 @@ export interface ScoreView {
 }
 
 // "0hard/0medium/-1037soft": see VehicleRoutingConstraintProvider for what each level counts
-export function parseScore(score: string): ScoreView | null {
-  const match = /(-?\d+)hard\/(-?\d+)medium\/(-?\d+)soft/.exec(score);
+export function parseScore(score: string | null): ScoreView | null {
+  const match = /(-?\d+)hard\/(-?\d+)medium\/(-?\d+)soft/.exec(score ?? '');
   if (!match) return null;
   const [hard, medium, soft] = match.slice(1).map(Number);
   return { hard, medium, soft, feasible: hard === 0 };
@@ -48,6 +48,7 @@ export interface StopView {
 }
 
 export interface RouteView {
+  routeId: number;
   shiftId: number;
   vehicleName: string;
   driverName: string | null;
@@ -79,7 +80,8 @@ export interface PlanLookups {
 
 // The API returns ids and times only. This joins them with what the page has already loaded.
 // A lookup can miss when a saved plan outlives an order or shift, so every field has a fallback.
-export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: PlanLookups): PlanView {
+// zone is the company's: the plan's times are wall-clock times there.
+export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: PlanLookups, zone: string): PlanView {
   const orderById = new Map(orders.map((order) => [order.id, order]));
   const shiftById = new Map(shifts.map((shift) => [shift.id, shift]));
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
@@ -105,14 +107,15 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
         windowStart: order?.windowStart ?? null,
         windowEnd: order?.windowEnd ?? null,
         windowStrict: order?.windowStrict ?? false,
-        arrival: serverLocalToInstant(stop.arrivalTime),
-        departure: serverLocalToInstant(stop.departureTime),
+        arrival: companyLocalToInstant(stop.arrivalTime, zone),
+        departure: companyLocalToInstant(stop.departureTime, zone),
         minutesLate: stop.minutesLate,
       };
     });
     const usedKg = stops.reduce((sum, stop) => sum + (stop.weightKg ?? 0), 0);
     const capacityKg = vehicle?.capacityKg ?? null;
     return {
+      routeId: route.routeId,
       shiftId: route.shiftId,
       vehicleName: vehicle?.name ?? shift?.vehicleName ?? `Vehicle #${route.vehicleId}`,
       driverName: shift?.driverName ?? null,

@@ -62,3 +62,10 @@
 
 .plan-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 4px; }
 .plan-foot span { flex: 1; min-width: 220px; }
+
+.publish { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; border-left: 4px solid var(--sign-amber-strong); }
+.publish.is-published { border-left-color: var(--brand); }
+.publish-text { flex: 1; min-width: 240px; }
+.publish .btn { flex: none; min-height: 40px; }
+.need-driver { display: flex; gap: 6px; margin-top: 4px; color: var(--ink-soft); }
+.need-driver app-icon { margin-top: 2px; color: var(--danger); }

@@ -36,6 +36,12 @@ The API has no account-level role: `company_members` makes someone an owner or d
 - **Owner:** signs up, creates a company, and becomes its owner.
 - **Driver:** signs up (`/register?role=driver` preselects this), gives their email to the owner, and is added from the Team page. Drivers can't add themselves to a company.
 
+## Publishing a plan to drivers
+
+1. The owner solves on **Plan routes**. The API saves the plan as a draft, and the page shows a **Draft** bar.
+2. **Publish to drivers** sends it (`POST /plans/{id}/publish`). Every route needs a driver, which the route copies from its shift when it's solved. So a driver added to a shift afterwards needs a fresh solve. Publishing also turns the plan's orders from `pending` to `planned`.
+3. Each driver opens **My routes** (`features/my-routes/`, from `GET /drivers/me/routes`): their routes by day, a map with the road path, and the stops in order. `?route=12` in the URL picks one.
+
 ## Project layout
 
 ```
@@ -44,6 +50,7 @@ src/app/
   shared/     Reusable UI: dialog, form field, address picker, maps, badges, pager
   features/   One folder per page, mirroring the API's feature/ packages
     planning/plan-view.ts   Joins the API's plan response with loaded orders and vehicles
+    my-routes/my-routes-view.ts   Same for a driver, who can't read orders: pins come from the company's addresses
 src/styles.css              Design tokens and shared component classes
 ```
 
@@ -64,7 +71,7 @@ Screen state lives in signals. Angular 22 components are `OnPush` by default, so
 
 ## Things the UI works around in the API
 
-- **Plan times have no timezone.** `PlanningService` builds them with `ZoneId.systemDefault()`, so they're in the server's zone. `serverLocalToInstant()` in `core/time.ts` reads them in the browser's zone, which is only right while both run on the same machine. Returning `Instant` from the API fixes this, and that function can then go.
-- **Plans aren't stored.** There's no endpoint to read a plan back and solving doesn't change order status, so the last plan per company and date is kept in `localStorage`.
-- **No road geometry.** Map lines connect stops in visiting order as straight segments.
+- **Plan times have no offset.** They're `LocalDateTime` on the company's clock, so `companyLocalToInstant()` in `core/time.ts` reads them in the company's timezone.
+- **Plans can't be read back.** The API saves them but has no `GET` for a plan, so the planner keeps the last plan per company and date in `localStorage`. Copies saved before plans had an id are ignored.
+- **A driver's route has ids only.** `GET /drivers/me/routes` has no company, date, vehicle name, customer or coordinates, and drivers can't read orders. The page keeps routes whose vehicle belongs to the current company, takes the date from the first stop, and finds each stop's pin by matching its address text against the company's addresses. A stop with no match is listed without a pin.
 - **No "my role" endpoint.** The shell calls the owner-only members list and treats a 403 as "not the owner".

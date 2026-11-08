@@ -1,4 +1,5 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
@@ -6,19 +7,20 @@ import { forkJoin, map } from 'rxjs';
 import { Api, MAX_PAGE_SIZE, fetchAll } from '../../core/api';
 import { CompanyContext } from '../../core/company-context';
 import { errorMessage } from '../../core/errors';
-import { Plan } from '../../core/models';
+import { Plan, ProblemDetail } from '../../core/models';
 import { dateInZone, formatDateTime, formatTime, formatWindow } from '../../core/time';
+import { Confirm } from '../../shared/confirm';
 import { DateNav } from '../../shared/date-nav';
 import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
 import { MapDepot, MapRoute, MapStop, RouteMap } from '../../shared/map/route-map';
 import { RouteView, buildPlanView, softCostLabel } from './plan-view';
 
-interface SavedPlan { plan: Plan; solvedAt: string; }
+interface SavedPlan { plan: Plan; solvedAt: string; publishedAt?: string; }
 
 @Component({
   selector: 'app-planning',
-  imports: [DecimalPipe, PercentPipe, RouterLink, DateNav, Icon, LoadState, RouteMap],
+  imports: [DecimalPipe, PercentPipe, RouterLink, Confirm, DateNav, Icon, LoadState, RouteMap],
   templateUrl: './planning.html',
   styleUrl: './planning.css',
 })
@@ -42,7 +44,19 @@ export class Planning {
     }))),
   });
 
-  protected readonly candidates = computed(() => (this.data.hasValue() ? this.data.value().candidates : []));
+  // Publishing turns the plan's orders from pending to planned, so after a reload they're no longer in the
+  // list above. This loads them back for names and pins. params returning undefined keeps the resource idle.
+  protected readonly plannedOrders = rxResource({
+    params: () => (this.saved()?.plan.status === 'published' ? { id: this.ctx.id() } : undefined),
+    stream: ({ params: { id } }) => fetchAll((page) => this.api.orders(id, { status: 'planned', page, size: MAX_PAGE_SIZE })),
+  });
+
+  // Orders on a published plan are planned now. Hiding them here rather than reloading keeps them in the
+  // lookups, so the plan doesn't blink out while the planned orders load.
+  private readonly publishedOrderIds = computed(() => new Set(this.saved()?.plan.status === 'published'
+    ? this.saved()!.plan.routes.flatMap((route) => route.stops.map((stop) => stop.orderId)) : []));
+  protected readonly candidates = computed(() => (this.data.hasValue()
+    ? this.data.value().candidates.filter((order) => !this.publishedOrderIds().has(order.id)) : []));
   protected readonly shifts = computed(() => (this.data.hasValue() ? this.data.value().shifts : []));
 
   // Selection: everything is included until someone unticks it
@@ -73,20 +87,54 @@ export class Planning {
   protected readonly highlighted = signal<number | null>(null);
   private timer: ReturnType<typeof setInterval> | undefined;
 
-  // The API doesn't store plans and has no endpoint to read one back, so this browser is the only copy
+  // The API saves each solved plan, but has no endpoint to read one back, so this browser keeps the copy it shows
   private readonly storageKey = computed(() => `route-scheduler.plan.${this.ctx.id()}.${this.ctx.date()}`);
 
-  protected readonly canSolve = computed(() => !this.solving() && this.selectedOrders().length > 0 && this.selectedShifts().length > 0);
+  protected readonly published = computed(() => this.saved()?.plan.status === 'published');
+
+  // A published plan stays on screen until the owner starts a new one, so solving can't replace it by accident
+  protected readonly canSolve = computed(() =>
+    !this.solving() && !this.published() && this.selectedOrders().length > 0 && this.selectedShifts().length > 0);
 
   protected readonly view = computed(() => {
     const saved = this.saved();
     if (!saved || !this.data.hasValue()) return null;
-    const { orders, shifts, vehicles, depots } = this.data.value();
-    return buildPlanView(saved.plan, { orders, shifts, vehicles, depots });
+    const { orders: pending, shifts, vehicles, depots } = this.data.value();
+    const orders = [...pending, ...(this.plannedOrders.value() ?? [])];
+
+    // Wait for the planned orders rather than flash "Order #12" placeholders for a moment
+    const known = new Set(orders.map((order) => order.id));
+    const missing = saved.plan.routes.some((route) => route.stops.some((stop) => !known.has(stop.orderId)));
+    if (missing && this.plannedOrders.isLoading()) return null;
+
+    return buildPlanView(saved.plan, { orders, shifts, vehicles, depots }, this.ctx.zone());
   });
   protected readonly solvedAtLabel = computed(() => {
     const saved = this.saved();
     return saved ? formatDateTime(saved.solvedAt, this.ctx.zone()) : '';
+  });
+  protected readonly publishedAtLabel = computed(() => formatDateTime(this.saved()?.publishedAt, this.ctx.zone()));
+
+  // Publishing: the API refuses while any route lacks a driver, so say which ones before the owner tries
+  protected readonly publishing = signal(false);
+  protected readonly publishError = signal<string | null>(null);
+  protected readonly confirmPublish = signal(false);
+  protected readonly routesWithoutDriver = computed(() => (this.view()?.routes ?? []).filter((route) => !route.driverName));
+  protected readonly withoutDriverLabel = computed(() => {
+    const names = this.routesWithoutDriver().map((route) => route.vehicleName);
+    return `${listOf(names)} ${names.length === 1 ? 'has' : 'have'}`;
+  });
+  protected readonly publishMessage = computed(() => {
+    const plan = this.view();
+    if (!plan) return '';
+    const drivers = [...new Set(plan.routes.map((route) => route.driverName))];
+    const parts = [
+      `${countOf(plan.routes.length, 'route')} ${plan.routes.length === 1 ? 'goes' : 'go'} to ${listOf(drivers)}, who will see ${drivers.length === 1 ? 'it' : 'them'} on My routes.`,
+      `${countOf(plan.assignedCount, 'order')} on ${plan.routes.length === 1 ? 'it' : 'them'} ${plan.assignedCount === 1 ? 'becomes' : 'become'} planned, and can't be edited or put in another plan after this.`,
+    ];
+    if (plan.unassigned.length > 0) parts.push(`${countOf(plan.unassigned.length, 'order')} not on any route ${plan.unassigned.length === 1 ? 'stays' : 'stay'} pending.`);
+    if (plan.score && !plan.score.feasible) parts.unshift('This plan breaks a hard rule.');
+    return parts.join(' ');
   });
 
   // Map inputs: routes once solved, loose pins before that
@@ -139,6 +187,8 @@ export class Planning {
       this.excludedShifts.set(new Set());
       this.solveError.set(null);
       this.highlighted.set(null);
+      this.confirmPublish.set(false);
+      this.publishError.set(null);
     });
   }
 
@@ -155,6 +205,7 @@ export class Planning {
       this.solving.set(false);
     };
 
+    this.publishError.set(null);
     this.api.solvePlan(this.ctx.id(), {
       planDate: this.ctx.date(),
       orderIds: this.selectedOrders().map((order) => order.id),
@@ -173,6 +224,34 @@ export class Planning {
     });
   }
 
+  protected openPublish(): void {
+    this.publishError.set(null);
+    this.confirmPublish.set(true);
+  }
+
+  protected publish(): void {
+    const saved = this.saved();
+    if (!saved || this.publishing()) return;
+    const key = this.storageKey();
+    this.publishing.set(true);
+    this.publishError.set(null);
+    // The API accepts notifyDrivers but doesn't act on it yet (no notification channel); drivers check My routes
+    this.api.publishPlan(saved.plan.planId, { notifyDrivers: true }).subscribe({
+      next: (plan) => {
+        this.publishing.set(false);
+        this.confirmPublish.set(false);
+        // The publish response leaves unassignedOrderIds empty, so keep the list from solving
+        const next: SavedPlan = { ...saved, plan: { ...plan, unassignedOrderIds: saved.plan.unassignedOrderIds }, publishedAt: new Date().toISOString() };
+        this.saved.set(next);
+        localStorage.setItem(key, JSON.stringify(next));
+      },
+      error: (error: unknown) => {
+        this.publishing.set(false);
+        this.publishError.set(publishErrorMessage(error));
+      },
+    });
+  }
+
   protected discardPlan(): void {
     localStorage.removeItem(this.storageKey());
     this.saved.set(null);
@@ -186,10 +265,33 @@ export class Planning {
   protected meterWidth(route: RouteView): string { return `${Math.min(route.loadShare ?? 0, 1) * 100}%`; }
 }
 
+// A copy saved before the API stored plans has no planId, so it can't be published, and its times were
+// written in the server's zone rather than the company's. Dropping it is safer than showing wrong times.
 function readSaved(key: string): SavedPlan | null {
   try {
-    return JSON.parse(localStorage.getItem(key) ?? 'null');
+    const saved = JSON.parse(localStorage.getItem(key) ?? 'null') as SavedPlan | null;
+    return saved?.plan?.planId ? saved : null;
   } catch {
     return null;
   }
+}
+
+function publishErrorMessage(error: unknown): string {
+  const detail = error instanceof HttpErrorResponse && error.status === 409 ? (error.error as ProblemDetail | null)?.detail : undefined;
+  // That 409 lists route ids, which mean nothing on this page. A route copies its shift's driver when it's
+  // created, so the usual cause is a driver added to the shift after solving.
+  if (detail?.startsWith('Assign a driver')) {
+    return 'A route in this plan has no driver. If you added one on the Shifts page after solving, solve again so the plan picks them up.';
+  }
+  return errorMessage(error);
+}
+
+function countOf(count: number, noun: string): string {
+  return `${count === 1 ? 'The' : `The ${count}`} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+// ["Liam", "Ava", "Noah"] -> "Liam, Ava and Noah"
+function listOf(names: (string | null)[]): string {
+  const known = names.map((name) => name ?? 'a driver');
+  return known.length <= 1 ? known.join('') : `${known.slice(0, -1).join(', ')} and ${known.at(-1)}`;
 }

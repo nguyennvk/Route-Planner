@@ -4,7 +4,7 @@
     <div class="page-actions">
       <app-date-nav />
       <button type="button" class="btn btn-primary solve" [disabled]="!canSolve()" (click)="solve()">
-        <app-icon name="route" /> {{ solving() ? 'Solving…' : (saved() ? 'Solve again' : 'Solve routes') }}
+        <app-icon name="route" /> {{ solving() ? 'Solving…' : (saved() && !published() ? 'Solve again' : 'Solve routes') }}
       </button>
     </div>
   </div>
@@ -70,6 +70,24 @@
 
         @if (view(); as plan) {
           <p class="map-note small muted">Lines follow the roads in visiting order. A straight line means no road route was available for that vehicle. Square markers are depots.</p>
+
+          <section class="card publish" [class.is-published]="published()" aria-label="Who can see this plan">
+            @if (published()) {
+              <span class="badge badge-ok">Published</span>
+              <p class="publish-text"><strong>Sent to drivers {{ publishedAtLabel() }}.</strong> Each driver sees their route on My routes, and the orders on it are now planned.</p>
+            } @else {
+              <span class="badge badge-warn">Draft</span>
+              <div class="publish-text">
+                <p><strong>Drivers can't see this plan yet.</strong> Publish it to send each route to its driver.</p>
+                @if (routesWithoutDriver().length > 0) {
+                  <p class="small need-driver"><app-icon name="warning" />
+                    <span>{{ withoutDriverLabel() }} no driver.
+                    <a [routerLink]="ctx.link('shifts')">Assign one on Shifts</a>, then solve again.</span></p>
+                }
+              </div>
+              <button type="button" class="btn btn-primary" [disabled]="routesWithoutDriver().length > 0" (click)="openPublish()">Publish to drivers</button>
+            }
+          </section>
 
           <section class="summary" aria-label="Plan summary">
             @if (plan.score && !plan.score.feasible) {
@@ -158,8 +176,13 @@
 
           <div class="plan-foot small muted">
             <app-icon name="info" />
-            <span>Solved {{ solvedAtLabel() }}. Plans aren't saved on the server yet, so this one lives in this browser only, and its orders stay pending.</span>
-            <button type="button" class="link-btn" (click)="discardPlan()">Discard</button>
+            @if (published()) {
+              <span>To plan more orders for this day, start a new plan. The published routes stay with their drivers.</span>
+              <button type="button" class="link-btn" (click)="discardPlan()">Start a new plan</button>
+            } @else {
+              <span>Solved {{ solvedAtLabel() }} and saved as a draft. Only this browser can show it again, because the API can't send a plan back yet.</span>
+              <button type="button" class="link-btn" (click)="discardPlan()">Discard</button>
+            }
           </div>
         } @else if (!solving()) {
           <p class="map-note small muted">Each pin is a selected order; square markers are depots. Solve to turn them into routes.</p>
@@ -170,3 +193,15 @@
     <app-load-state [error]="data.error()" (retry)="data.reload()" />
   }
 </div>
+
+<app-confirm
+  [open]="confirmPublish()"
+  heading="Publish this plan?"
+  [message]="publishMessage()"
+  action="Publish to drivers"
+  actionClass="btn-primary"
+  cancelLabel="Not yet"
+  [busy]="publishing()"
+  [error]="publishError()"
+  (confirmed)="publish()"
+  (cancelled)="confirmPublish.set(false)" />

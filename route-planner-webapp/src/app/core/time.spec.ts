@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dateInZone, formatWindow, instantToLocal, localToInstant, shiftDate } from './time';
+import { companyLocalToInstant, dateInZone, formatWindow, instantToLocal, localToInstant, shiftDate } from './time';
 
 describe('time', () => {
   it('converts a wall-clock time in a zone to an instant', () => {
@@ -32,5 +32,11 @@ describe('time', () => {
     expect(formatWindow(null, null, 'UTC')).toBe('Any time');
     expect(formatWindow('2026-11-02T09:00:00Z', '2026-11-02T11:30:00Z', 'UTC')).toBe('09:00 – 11:30');
     expect(formatWindow('2026-11-02T09:00:00Z', null, 'UTC')).toBe('From 09:00');
+  });
+
+  it("reads the API's plan times on the company's clock, whatever the browser's zone", () => {
+    expect(companyLocalToInstant('2026-11-02T09:05:30', 'America/Toronto')).toBe('2026-11-02T14:05:30.000Z');
+    expect(companyLocalToInstant('2026-11-02T09:05:30.123456', 'America/Toronto')).toBe('2026-11-02T14:05:30.000Z');
+    expect(companyLocalToInstant(null, 'America/Toronto')).toBeNull();
   });
 });

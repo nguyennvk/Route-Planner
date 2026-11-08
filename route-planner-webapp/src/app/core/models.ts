@@ -200,27 +200,35 @@ export interface PlanRequest {
   shiftIds: number[];
 }
 
+export type PlanStatus = 'draft' | 'solving' | 'published' | 'completed' | 'failed';
+
+// Times are LocalDateTime on the company's wall clock (ZonedTime.toLocalDateTime in the API), with no offset
 export interface PlanStop {
+  stopId: number;
   sequence: number;
   orderId: number;
-  name: string;
+  name: string;               // the order's raw address
   arrivalTime: string | null;
   departureTime: string | null;
   minutesLate: number;
 }
 
+// RouteResponse.java: what a plan holds per vehicle, and what GET /drivers/me/routes lists for a driver
 export interface PlanRoute {
+  routeId: number;
   shiftId: number;
   vehicleId: number;
   stops: PlanStop[];
-  // OSRM encoded polyline (precision 5) of the road path, depot to depot. Missing on plans saved before
-  // the API sent it, and null when OSRM couldn't route that vehicle.
-  geometry?: string | null;
+  // OSRM encoded polyline (precision 5) of the road path, depot to depot; null when OSRM couldn't route it
+  geometry: string | null;
 }
 
 export interface Plan {
+  planId: number;
   name: string;
-  score: string;
+  status: PlanStatus;
+  planDate: string;
+  score: string | null;       // null until solved
   routes: PlanRoute[];
-  unassignedOrderIds: number[];
+  unassignedOrderIds: number[];   // only known right after solving; publishing returns an empty list
 }

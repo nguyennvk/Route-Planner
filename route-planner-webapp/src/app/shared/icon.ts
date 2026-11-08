@@ -1,15 +1,15 @@
 import { Component, ElementRef, effect, inject, input } from '@angular/core';
 import {
   ArrowLeft, ArrowRight, Boxes, Building2, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock, IconNode,
-  Info, LayoutDashboard, LogOut, MapPin, Menu, Package, Pencil, Plus, Route, Search, Settings, Trash2, TriangleAlert,
+  Info, LayoutDashboard, LogOut, MapPin, Menu, Navigation, Package, Pencil, Plus, RefreshCw, Route, Search, Settings, Trash2, TriangleAlert,
   Truck, Users, UserRound, Warehouse, X, createElement,
 } from 'lucide';
 
 const ICONS = {
   'arrow-left': ArrowLeft, 'arrow-right': ArrowRight, boxes: Boxes, building: Building2, 'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight, alert: CircleAlert, check: CircleCheck, clock: Clock, info: Info,
-  dashboard: LayoutDashboard, logout: LogOut, pin: MapPin, menu: Menu, package: Package, pencil: Pencil, plus: Plus,
-  route: Route, search: Search, settings: Settings, trash: Trash2, warning: TriangleAlert, truck: Truck, users: Users,
+  dashboard: LayoutDashboard, logout: LogOut, pin: MapPin, menu: Menu, navigation: Navigation, package: Package, pencil: Pencil, plus: Plus,
+  refresh: RefreshCw, route: Route, search: Search, settings: Settings, trash: Trash2, warning: TriangleAlert, truck: Truck, users: Users,
   user: UserRound, depot: Warehouse, close: X,
 } satisfies Record<string, IconNode>;
 

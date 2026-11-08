@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { EMPTY, Observable, expand, map, reduce } from 'rxjs';
 import {
   Address, AddressSuggestion, Company, Customer, CustomerRequest, Depot, Item, ItemRequest, LoginResponse,
-  Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest,
+  Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest, PlanRoute,
   RegisterRequest, Shift, ShiftRequest, Vehicle, VehicleRequest, VehicleType,
 } from './models';
 
@@ -104,6 +104,11 @@ export class Api {
 
   // planning: blocks until the solver stops (5 s without improvement, 30 s at most)
   solvePlan(companyId: number, body: PlanRequest) { return this.http.post<Plan>(`${API}/companies/${companyId}/plans`, body); }
+  // Owner only. Every route needs a driver, and the plan's orders become 'planned'
+  publishPlan(planId: number, body: { notifyDrivers: boolean }) { return this.http.post<Plan>(`${API}/plans/${planId}/publish`, body); }
+
+  // drivers: the logged-in user's routes from published plans, across all their companies, earliest first
+  myRoutes() { return this.http.get<PlanRoute[]>(`${API}/drivers/me/routes`); }
 }
 
 // Follows totalPages for lists a dropdown or the planner needs in full (the API caps a page at 200)

@@ -1,0 +1,92 @@
+<div class="page">
+  <div class="page-head">
+    <div><h1>My routes</h1><p>Routes {{ ctx.company()?.name }} has published to you. Times are in {{ ctx.zone() }}.</p></div>
+    <div class="page-actions">
+      <button type="button" class="btn" [disabled]="data.isLoading()" (click)="data.reload()"><app-icon name="refresh" /> {{ data.isLoading() ? 'Checking…' : 'Check for new routes' }}</button>
+    </div>
+  </div>
+
+  <ng-template #routeLink let-route>
+    <a class="card pick-route" [routerLink]="[]" [queryParams]="{ route: route.routeId }"
+       [class.active]="route.routeId === selected()?.routeId" [attr.aria-current]="route.routeId === selected()?.routeId ? 'true' : null">
+      <strong>{{ dayLabel(route.date) }}</strong>
+      <span class="small muted">{{ route.vehicleName }}, {{ route.stops.length }} {{ route.stops.length === 1 ? 'stop' : 'stops' }}</span>
+      <span class="mono small">{{ time(route.firstArrival) }} – {{ time(route.lastDeparture) }}</span>
+    </a>
+  </ng-template>
+
+  @if (data.hasValue()) {
+    @if (routes().length === 0) {
+      <section class="card card-pad empty">
+        <app-icon name="navigation" [size]="28" />
+        <h2>No routes yet</h2>
+        <p class="muted">When the owner publishes a plan with you on one of its shifts, your route shows up here with its stops in order.</p>
+      </section>
+    } @else {
+      <div class="layout">
+        <nav class="route-list" aria-label="Your routes">
+          @if (upcoming().length > 0) {
+            <h2 class="section-title">Upcoming</h2>
+            <ul>
+              @for (route of upcoming(); track route.routeId) {
+                <li><ng-container [ngTemplateOutlet]="routeLink" [ngTemplateOutletContext]="{ $implicit: route }" /></li>
+              }
+            </ul>
+          } @else {
+            <p class="small muted">Nothing coming up.</p>
+          }
+          @if (earlier().length > 0) {
+            <details class="earlier" [open]="upcoming().length === 0">
+              <summary>Earlier routes ({{ earlier().length }})</summary>
+              <ul>
+                @for (route of earlier(); track route.routeId) {
+                  <li><ng-container [ngTemplateOutlet]="routeLink" [ngTemplateOutletContext]="{ $implicit: route }" /></li>
+                }
+              </ul>
+            </details>
+          }
+        </nav>
+
+        @if (selected(); as route) {
+          <section class="detail" aria-labelledby="route-heading">
+            <div>
+              <h2 id="route-heading" class="detail-title">{{ dayLabel(route.date) }}, {{ route.vehicleName }}</h2>
+              <p class="small muted">
+                {{ route.stops.length }} {{ route.stops.length === 1 ? 'stop' : 'stops' }}@if (route.depot) {, starting and ending at {{ route.depot.name }}}.
+                @if (route.lateCount > 0) { <span class="badge badge-danger">{{ route.lateCount }} planned late</span> }
+              </p>
+            </div>
+
+            <app-route-map [routes]="mapRoutes()" [depots]="mapDepots()" />
+            @if (route.unplacedCount > 0) {
+              <p class="small muted">{{ route.unplacedCount }} {{ route.unplacedCount === 1 ? "stop isn't" : "stops aren't" }} on the map because the address has no pin. Every stop is listed below.</p>
+            }
+
+            <ol class="stops" aria-label="Stops in driving order">
+              @if (route.depot) {
+                <li class="stop depot"><span class="seq depot-mark" aria-hidden="true"></span>
+                  <span class="stop-main"><strong>Start at {{ route.depot.name }}</strong><span class="small muted">{{ route.depot.address.normalizedAddress || route.depot.address.rawAddress }}</span></span></li>
+              }
+              @for (stop of route.stops; track stop.stopId) {
+                <li class="stop">
+                  <span class="seq" aria-hidden="true">{{ stop.sequence + 1 }}</span>
+                  <span class="stop-main">
+                    <strong><span class="visually-hidden">Stop {{ stop.sequence + 1 }}: </span>{{ stop.address }}</strong>
+                    <span class="small muted">Arrive <span class="mono">{{ time(stop.arrival) }}</span>, leave <span class="mono">{{ time(stop.departure) }}</span></span>
+                  </span>
+                  @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }
+                </li>
+              }
+              @if (route.depot) {
+                <li class="stop depot"><span class="seq depot-mark" aria-hidden="true"></span>
+                  <span class="stop-main"><strong>Back to {{ route.depot.name }}</strong></span></li>
+              }
+            </ol>
+          </section>
+        }
+      </div>
+    }
+  } @else {
+    <app-load-state [error]="data.error()" (retry)="data.reload()" />
+  }
+</div>

@@ -72,12 +72,7 @@ export function formatDay(date: string): string {
     .format(new Date(Date.UTC(year, month - 1, day)));
 }
 
-// The plan's arrival times are LocalDateTime with no zone, built with ZoneId.systemDefault() in
-// PlanningService: they are wall-clock times in the API server's zone, not the company's.
-// Locally the server and browser share a machine, so the browser's zone is the right one to read them in.
-// If the API starts returning Instants, delete this and pass them straight to formatTime.
-export const API_SERVER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-export function serverLocalToInstant(local: string | null): string | null {
-  return local ? localToInstant(local.slice(0, 19), API_SERVER_TIMEZONE) : null;
+// Plan and route times arrive as LocalDateTime on the company's wall clock, e.g. "2026-11-02T09:05:30"
+export function companyLocalToInstant(local: string | null, zone: string): string | null {
+  return local ? localToInstant(local.slice(0, 19), zone) : null;
 }

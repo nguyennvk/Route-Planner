@@ -12,8 +12,10 @@ const vehicle: Vehicle = { id: 7, name: 'Van 7', type: 'van', capacityKg: 100, c
 const depot = { id: 3, name: 'Main', address: {} } as Depot;
 const shift: Shift = { id: 20, vehicleId: 7, vehicleName: 'Van 7', driverUserId: 4, driverName: 'Liam', startAt: '', endAt: '' };
 
+const planBase = { planId: 1, name: 'p', status: 'draft' as const, planDate: '2026-11-02' };
+
 const stop = (orderId: number, sequence: number, minutesLate = 0) => ({
-  sequence, orderId, name: 'raw', arrivalTime: '2026-11-02T09:00:00', departureTime: '2026-11-02T09:05:00', minutesLate,
+  stopId: orderId * 10, sequence, orderId, name: 'raw', arrivalTime: '2026-11-02T09:00:00', departureTime: '2026-11-02T09:05:00', minutesLate,
 });
 
 describe('parseScore', () => {
@@ -39,8 +41,8 @@ describe('buildPlanView', () => {
   const lookups = { orders: [order(1, 30), order(2, 45.5), order(3, 10)], shifts: [shift], vehicles: [vehicle], depots: [depot] };
 
   it('joins stops with their orders and adds up the load', () => {
-    const plan: Plan = { name: 'p', score: '0hard/0medium/-10soft', unassignedOrderIds: [3], routes: [{ shiftId: 20, vehicleId: 7, stops: [stop(1, 0), stop(2, 1, 12)] }] };
-    const view = buildPlanView(plan, lookups);
+    const plan: Plan = { ...planBase, score: '0hard/0medium/-10soft', unassignedOrderIds: [3], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [stop(1, 0), stop(2, 1, 12)] }] };
+    const view = buildPlanView(plan, lookups, 'America/Toronto');
     const route = view.routes[0];
 
     expect(route.vehicleName).toBe('Van 7');
@@ -49,31 +51,34 @@ describe('buildPlanView', () => {
     expect(route.usedKg).toBe(75.5);
     expect(route.loadShare).toBeCloseTo(0.755);
     expect(route.stops[0].customerName).toBe('Customer 1');
+    // 09:00 on the company's clock in Toronto, not the browser's
+    expect(route.stops[0].arrival).toBe('2026-11-02T14:00:00.000Z');
+    expect(route.routeId).toBe(1);
     expect(view.assignedCount).toBe(2);
     expect(view.lateCount).toBe(1);
     expect(view.unassigned).toEqual([{ orderId: 3, customerName: 'Customer 3', address: '3 Main St', weightKg: 10 }]);
   });
 
   it('separates vehicles the solver left unused', () => {
-    const plan: Plan = { name: 'p', score: '0hard/0medium/0soft', unassignedOrderIds: [], routes: [{ shiftId: 20, vehicleId: 7, stops: [] }] };
-    const view = buildPlanView(plan, lookups);
+    const plan: Plan = { ...planBase, score: '0hard/0medium/0soft', unassignedOrderIds: [], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [] }] };
+    const view = buildPlanView(plan, lookups, 'America/Toronto');
     expect(view.routes).toEqual([]);
     expect(view.idleRoutes.map((route) => route.vehicleName)).toEqual(['Van 7']);
   });
 
   it('keeps a route color tied to its shift, whatever order routes arrive in', () => {
     const shifts = [shift, { ...shift, id: 21 }];
-    const a = { shiftId: 20, vehicleId: 7, stops: [stop(1, 0)] };
-    const b = { shiftId: 21, vehicleId: 7, stops: [stop(2, 0)] };
-    const first = buildPlanView({ name: 'p', score: '', unassignedOrderIds: [], routes: [a, b] }, { ...lookups, shifts });
-    const second = buildPlanView({ name: 'p', score: '', unassignedOrderIds: [], routes: [b, a] }, { ...lookups, shifts });
+    const a = { routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [stop(1, 0)] };
+    const b = { routeId: 2, shiftId: 21, vehicleId: 7, geometry: null, stops: [stop(2, 0)] };
+    const first = buildPlanView({ ...planBase, score: '', unassignedOrderIds: [], routes: [a, b] }, { ...lookups, shifts }, 'America/Toronto');
+    const second = buildPlanView({ ...planBase, score: '', unassignedOrderIds: [], routes: [b, a] }, { ...lookups, shifts }, 'America/Toronto');
     expect(first.routes[1].fill).toBe(ROUTE_COLORS[1].fill);
     expect(second.routes[1].fill).toBe(ROUTE_COLORS[1].fill);
   });
 
   it('falls back to what the plan itself says when an order is gone', () => {
-    const plan: Plan = { name: 'p', score: '', unassignedOrderIds: [99], routes: [{ shiftId: 20, vehicleId: 7, stops: [stop(99, 0)] }] };
-    const view = buildPlanView(plan, lookups);
+    const plan: Plan = { ...planBase, score: '', unassignedOrderIds: [99], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [stop(99, 0)] }] };
+    const view = buildPlanView(plan, lookups, 'America/Toronto');
     expect(view.routes[0].stops[0].customerName).toBe('Order #99');
     expect(view.routes[0].stops[0].address).toBe('raw');
     expect(view.routes[0].stops[0].latitude).toBeNull();

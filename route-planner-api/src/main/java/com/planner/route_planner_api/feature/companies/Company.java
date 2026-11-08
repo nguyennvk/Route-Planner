@@ -1,5 +1,7 @@
 package com.planner.route_planner_api.feature.companies;
 
+import java.time.ZoneId;
+
 import com.planner.route_planner_api.common.persistence.BaseEntity;
 
 import jakarta.persistence.Column;
@@ -30,5 +32,10 @@ public class Company extends BaseEntity{
 
     public void changeTimezone(String timezone){
         this.timezone = timezone;
+    }
+
+    // timezone is validated as an IANA name on the way in, so this doesn't throw
+    public ZoneId zoneId(){
+        return ZoneId.of(timezone);
     }
 }

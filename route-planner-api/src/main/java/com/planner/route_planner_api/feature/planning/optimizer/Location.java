@@ -11,6 +11,7 @@ public class Location{
     private Double lattitude;
     private Double longitude;
     private Map<Location, Long> drivingTimeInSeconds;
+    private Map<Location, Long> drivingDistanceMeter;
 
     public Location(double lattitude, double longitude){
         this.lattitude = lattitude;
@@ -19,6 +20,10 @@ public class Location{
 
     public long getDrivingTimeTo(Location location) {
         return drivingTimeInSeconds.get(location);
+    }
+
+    public long getDrivingDistanceTo(Location location){
+        return drivingDistanceMeter.get(location);
     }
     
 }

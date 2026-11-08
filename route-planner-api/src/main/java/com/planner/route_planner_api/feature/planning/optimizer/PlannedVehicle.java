@@ -1,5 +1,8 @@
 package com.planner.route_planner_api.feature.planning.optimizer;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,5 +60,29 @@ public class PlannedVehicle {
         return new Double[][] { latitudes, longitudes };
     }
 
+    public LocalDateTime getReturnTime() {
+        if (visits.isEmpty()) return null;
+        Visit last = visits.get(visits.size() - 1);
+        return last.getDepartureTime().plusSeconds(last.getLocation().getDrivingTimeTo(homeLocation));
+    }
+
+    public Integer getTotalMinutes() {
+        LocalDateTime returnTime = getReturnTime();
+        if (returnTime == null) return 0;
+        return (int) Duration.between(departureTime, returnTime).toMinutes();
+    }
+
+    public BigDecimal getTotalDistance() {
+        if (visits.isEmpty()) return null;
+        Visit last = visits.get(visits.size() - 1);
+        Long totalDistance = last.getLocation().getDrivingDistanceTo(homeLocation);
+        Location prevLocation = homeLocation;
+        for (Visit visit : this.visits) {
+            totalDistance += prevLocation.getDrivingDistanceTo(visit.getLocation());
+            prevLocation = visit.getLocation();
+        }
+        return BigDecimal.valueOf(totalDistance).divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP);
+
+    }
 
 }

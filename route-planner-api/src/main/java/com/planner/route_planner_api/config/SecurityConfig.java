@@ -42,6 +42,7 @@ public class SecurityConfig {
                     "/api/v1/auth/refresh", 
                     "/api/v1/auth/logout").permitAll()
                 .requestMatchers("/error", "/actuator/health").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/shared/**").permitAll()   // share links: the token is the permission
                 .anyRequest().authenticated()
             ).oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
         return http.build();

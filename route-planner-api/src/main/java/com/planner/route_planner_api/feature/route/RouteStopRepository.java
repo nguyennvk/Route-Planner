@@ -10,4 +10,7 @@ public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     // Joins order and address in the same SELECT; without it, reading them is 2 extra queries per stop (N+1)
     @EntityGraph(attributePaths = {"order", "order.address"})
     List<RouteStop> findByRouteIn(List<Route> routes);
+
+    @EntityGraph(attributePaths = {"order", "order.address"})
+    List<RouteStop> findByRoute(Route route);
 }

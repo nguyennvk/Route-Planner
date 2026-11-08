@@ -31,8 +31,6 @@ public record PlanResponse(
     List<Long> unassignedOrderIds   // orders that didn't fit on any route; only known right after solving
 ) {
 
-    public record RouteResponse(Long routeId, Long shiftId, Long vehicleId, List<StopResponse> stops, String geometry) {}
-
     public record StopResponse(
         Long stopId,
         int sequence,               // 0 = first stop after the depot
@@ -51,7 +49,7 @@ public record PlanResponse(
             .collect(Collectors.groupingBy(RouteStop::getRoute));
 
         List<RouteResponse> routeResponses = routes.stream()
-            .map(route -> toRoute(route, stopsByRoute.getOrDefault(route, List.of()), zone))
+            .map(route -> RouteResponse.toRoute(route, stopsByRoute.getOrDefault(route, List.of()), zone))
             .toList();
 
         return new PlanResponse(
@@ -65,21 +63,7 @@ public record PlanResponse(
         );
     }
 
-    private static RouteResponse toRoute(Route route, List<RouteStop> stops, ZoneId zone) {
-        List<StopResponse> stopResponses = stops.stream()
-            .sorted(Comparator.comparing(RouteStop::getSequence))
-            .map(stop -> toStop(stop, zone))
-            .toList();
-        return new RouteResponse(
-            route.getId(),
-            route.getVehicleShift().getId(),    // getId() on a lazy proxy doesn't hit the database
-            route.getVehicle().getId(),
-            stopResponses,
-            route.getGeometry()
-        );
-    }
-
-    private static StopResponse toStop(RouteStop stop, ZoneId zone) {
+    protected static StopResponse toStop(RouteStop stop, ZoneId zone) {
         Order order = stop.getOrder();
         return new StopResponse(
             stop.getId(),

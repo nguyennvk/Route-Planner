@@ -12,6 +12,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.planner.route_planner_api.common.error.BadRequestException;
+import com.planner.route_planner_api.common.error.ConflictException;
 import com.planner.route_planner_api.common.persistence.BaseEntity;
 import com.planner.route_planner_api.feature.addresses.Address;
 import com.planner.route_planner_api.feature.companies.Company;
@@ -154,6 +155,14 @@ public class Order extends BaseEntity {
 
     public void changeNotes(String notes) {
         this.notes = notes;
+    }
+
+    // Its plan was published; from now on the order can't be edited or put in another plan
+    public void markPlanned() {
+        if (status != OrderStatus.pending) {
+            throw new ConflictException("Order " + getId() + " is " + status + ", not pending");
+        }
+        this.status = OrderStatus.planned;
     }
 
     public void cancel() {

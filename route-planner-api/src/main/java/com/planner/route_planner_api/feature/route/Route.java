@@ -113,4 +113,8 @@ public class Route {
         this.geometry = geometry;
     }
 
+    public void setDriver(User driver) {
+        this.driver = driver;
+    }
+
 }

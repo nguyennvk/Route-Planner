@@ -47,9 +47,12 @@ public class PlanWriter {
         return planRepository.save(plan);
     }
 
+    // What saveSolution wrote, so the caller can build the response without querying it back
+    public record SavedSolution(Plan plan, List<Route> routes, List<RouteStop> stops) {}
+
     // Score + routes + stops in one transaction: either the plan is solved with everything, or nothing changed
     @Transactional
-    public void saveSolution(Long planId, VehicleRoutePlan solved, Map<Long, VehicleShift> shiftsById,
+    public SavedSolution saveSolution(Long planId, VehicleRoutePlan solved, Map<Long, VehicleShift> shiftsById,
                              Map<Long, Order> ordersById, ZoneId zone) {
         Plan plan = planRepository.findById(planId).orElseThrow();
         HardMediumSoftScore score = solved.getScore();
@@ -70,6 +73,7 @@ public class PlanWriter {
                 ZonedTime.toInstant(vehicle.getDepartureTime(), zone),
                 ZonedTime.toInstant(vehicle.getReturnTime(), zone)
             );
+            route.setGeometry(vehicle.getGeometry());        // null when OSRM couldn't route this vehicle
             routes.add(route);
 
             List<Visit> visits = vehicle.getVisits();       // already in driving order
@@ -86,6 +90,7 @@ public class PlanWriter {
         }
         routeRepository.saveAll(routes);                     // routes first: stops need their ids
         routeStopRepository.saveAll(stops);
+        return new SavedSolution(plan, routes, stops);
     }
 
     // Own transaction, so it still commits when saveSolution rolled back

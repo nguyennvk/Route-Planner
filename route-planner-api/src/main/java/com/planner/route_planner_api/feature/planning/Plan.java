@@ -1,12 +1,12 @@
 package com.planner.route_planner_api.feature.planning;
 
-import java.sql.Date;
 import java.time.Instant;
 import java.time.LocalDate;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.planner.route_planner_api.common.error.ConflictException;
 import com.planner.route_planner_api.common.persistence.BaseEntity;
 import com.planner.route_planner_api.feature.auth.User;
 import com.planner.route_planner_api.feature.companies.Company;
@@ -67,7 +67,11 @@ public class Plan extends BaseEntity {
         this.status = PlanStatus.draft; 
     }
 
+    // Only a solved draft goes out to drivers: not one still solving, failed, or already published
     public void publish() {
+        if (status != PlanStatus.draft || solvedAt == null) {
+            throw new ConflictException("Only a solved draft plan can be published; this one is " + status);
+        }
         this.status = PlanStatus.published;
         this.publishedAt = Instant.now();
     }

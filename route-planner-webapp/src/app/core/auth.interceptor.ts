@@ -14,8 +14,12 @@ const PUBLIC_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/l
 let refreshInFlight: Observable<LoginResponse> | null = null;
 
 // Plays the role of a servlet filter, but on the way out of the client instead of into the server
+// Share links work without a login. Sending an expired token there would make Spring answer 401 anyway
+// (a bad bearer token is rejected before permitAll is checked), and the refresh path below would end on /login
+const SHARED_PREFIX = '/api/v1/shared/';
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  if (PUBLIC_PATHS.some((path) => req.url.endsWith(path))) {
+  if (PUBLIC_PATHS.some((path) => req.url.endsWith(path)) || req.url.includes(SHARED_PREFIX)) {
     return next(req);
   }
 

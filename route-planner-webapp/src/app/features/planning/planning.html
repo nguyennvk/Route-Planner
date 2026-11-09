@@ -122,6 +122,12 @@
                     <h3>{{ route.vehicleName }}</h3>
                     <span class="small muted">{{ route.driverName || 'No driver yet' }}, {{ route.stops.length }} {{ route.stops.length === 1 ? 'stop' : 'stops' }}</span>
                   </div>
+                  @if (published() && route.shareToken) {
+                    <button type="button" class="btn btn-small copy-link" (click)="copyDriverLink(route)"
+                            [attr.aria-label]="'Copy the no-login link for ' + route.vehicleName">
+                      <app-icon [name]="copied() === route.routeId ? 'check' : 'link'" /> {{ copied() === route.routeId ? 'Link copied' : 'Copy driver link' }}
+                    </button>
+                  }
                   @if (route.capacityKg) {
                     <div class="load" [class.over]="overloaded(route)">
                       <span class="small"><span class="load-value">{{ route.usedKg | number: '1.0-0' }}</span> of {{ route.capacityKg | number: '1.0-0' }} kg ({{ route.loadShare | percent }})</span>

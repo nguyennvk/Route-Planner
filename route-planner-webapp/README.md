@@ -41,6 +41,9 @@ The API has no account-level role: `company_members` makes someone an owner or d
 1. The owner solves on **Plan routes**. The API saves the plan as a draft, and the page shows a **Draft** bar.
 2. **Publish to drivers** sends it (`POST /plans/{id}/publish`). Every route needs a driver, which the route copies from its shift when it's solved. So a driver added to a shift afterwards needs a fresh solve. Publishing also turns the plan's orders from `pending` to `planned`.
 3. Each driver opens **My routes** (`features/my-routes/`, from `GET /drivers/me/routes`): their routes by day, a map with the road path, and the stops in order. `?route=12` in the URL picks one.
+4. The driver accepts or turns down each route (`POST /drivers/me/routes/{id}/accept` or `/reject`, with an optional reason). They can change their answer until the route starts. After it starts or finishes, or once the plan is completed, the API answers 409 and the route's `answerOpen` is false.
+5. An accepted route has **Start route** (`/start`), which moves its orders from `planned` to `out_for_delivery`. Then **Finish route** (`/finish`) asks for confirmation first. The planner loads both `planned` and `out_for_delivery` orders, so a published plan still shows customer names after its routes start. The panel for all of this is `shared/route-actions.ts`.
+6. Drivers can also do all of this without logging in. Once a plan is published, each route card on **Plan routes** has **Copy driver link**, which copies `/route/{shareToken}` (`features/shared-route/`, calling `/api/v1/shared/routes/{token}` and its `/accept`, `/reject`, `/start` and `/finish`). The auth interceptor skips `/shared/` calls, because Spring answers 401 to an expired bearer token even on a `permitAll` path.
 
 ## Project layout
 

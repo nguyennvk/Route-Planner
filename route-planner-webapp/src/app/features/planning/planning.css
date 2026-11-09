@@ -69,3 +69,5 @@
 .publish .btn { flex: none; min-height: 40px; }
 .need-driver { display: flex; gap: 6px; margin-top: 4px; color: var(--ink-soft); }
 .need-driver app-icon { margin-top: 2px; color: var(--danger); }
+
+.copy-link { margin-left: auto; }

@@ -1,0 +1,50 @@
+<header class="top">
+  <a routerLink="/" class="home"><app-brand /></a>
+</header>
+
+<main class="page">
+  @if (data.hasValue()) {
+    @let route = data.value()!;
+    <div>
+      <h1>Your route for {{ day(date()) }}</h1>
+      <p class="muted">
+        {{ stops().length }} {{ stops().length === 1 ? 'stop' : 'stops' }}@if (stops().length > 0) {, first arrival {{ time(stops()[0].arrivalTime) }}, last stop done by {{ time(stops()[stops().length - 1].departureTime) }}}.
+        Times are local to the company.
+      </p>
+    </div>
+
+    <app-route-actions [routeId]="route.routeId" [status]="route.assignmentStatus" [rejectionReason]="route.rejectionReason"
+                       [answerOpen]="route.answerOpen" [startedAt]="route.startedAt" [finishedAt]="route.finishedAt"
+                       [busy]="acting()" [error]="actionError()"
+                       (accept)="accept()" (reject)="reject($event)" (start)="start()" (finish)="finish()" />
+
+    @if (mapRoutes().length > 0) {
+      <app-route-map [routes]="mapRoutes()" />
+    }
+
+    <ol class="stops" aria-label="Stops in driving order">
+      @for (stop of stops(); track stop.stopId) {
+        <li class="stop">
+          <span class="seq" aria-hidden="true">{{ stop.sequence + 1 }}</span>
+          <span class="stop-main">
+            <strong><span class="visually-hidden">Stop {{ stop.sequence + 1 }}: </span>{{ stop.name }}</strong>
+            <span class="small muted">Arrive <span class="mono">{{ time(stop.arrivalTime) }}</span>, leave <span class="mono">{{ time(stop.departureTime) }}</span></span>
+          </span>
+          @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }
+        </li>
+      }
+    </ol>
+    <p class="small muted">Log in to Route Scheduler to see the depot and stop pins on the map.</p>
+  } @else if (notFound()) {
+    <section class="card card-pad gone">
+      <app-icon name="alert" [size]="28" />
+      <h1>This link doesn't open a route</h1>
+      <p class="muted">The route may not be published yet, or the link was copied incompletely. Ask the owner to send it again.</p>
+    </section>
+  } @else if (data.error()) {
+    <p class="banner banner-error" role="alert"><app-icon name="alert" /> {{ errorText() }}</p>
+    <button type="button" class="btn" (click)="data.reload()">Try again</button>
+  } @else {
+    <p class="muted" role="status">Loading your route…</p>
+  }
+</main>

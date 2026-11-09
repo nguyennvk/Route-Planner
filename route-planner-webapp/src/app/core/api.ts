@@ -109,6 +109,17 @@ export class Api {
 
   // drivers: the logged-in user's routes from published plans, across all their companies, earliest first
   myRoutes() { return this.http.get<PlanRoute[]>(`${API}/drivers/me/routes`); }
+  acceptMyRoute(routeId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/accept`, null); }
+  rejectMyRoute(routeId: number, reason: string | null) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/reject`, { reason }); }
+  startMyRoute(routeId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/start`, null); }
+  finishMyRoute(routeId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/finish`, null); }
+
+  // Share link: no login, the token in the path is the permission
+  sharedRoute(token: string) { return this.http.get<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}`); }
+  acceptSharedRoute(token: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/accept`, null); }
+  rejectSharedRoute(token: string, reason: string | null) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/reject`, { reason }); }
+  startSharedRoute(token: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/start`, null); }
+  finishSharedRoute(token: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/finish`, null); }
 }
 
 // Follows totalPages for lists a dropdown or the planner needs in full (the API caps a page at 200)

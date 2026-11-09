@@ -41,7 +41,7 @@ describe('buildPlanView', () => {
   const lookups = { orders: [order(1, 30), order(2, 45.5), order(3, 10)], shifts: [shift], vehicles: [vehicle], depots: [depot] };
 
   it('joins stops with their orders and adds up the load', () => {
-    const plan: Plan = { ...planBase, score: '0hard/0medium/-10soft', unassignedOrderIds: [3], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [stop(1, 0), stop(2, 1, 12)] }] };
+    const plan: Plan = { ...planBase, score: '0hard/0medium/-10soft', unassignedOrderIds: [3], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, assignmentStatus: 'pending' as const, rejectionReason: null, answerOpen: true, startedAt: null, finishedAt: null, shareToken: 'tok', stops: [stop(1, 0), stop(2, 1, 12)] }] };
     const view = buildPlanView(plan, lookups, 'America/Toronto');
     const route = view.routes[0];
 
@@ -60,7 +60,7 @@ describe('buildPlanView', () => {
   });
 
   it('separates vehicles the solver left unused', () => {
-    const plan: Plan = { ...planBase, score: '0hard/0medium/0soft', unassignedOrderIds: [], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [] }] };
+    const plan: Plan = { ...planBase, score: '0hard/0medium/0soft', unassignedOrderIds: [], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, assignmentStatus: 'pending' as const, rejectionReason: null, answerOpen: true, startedAt: null, finishedAt: null, shareToken: 'tok', stops: [] }] };
     const view = buildPlanView(plan, lookups, 'America/Toronto');
     expect(view.routes).toEqual([]);
     expect(view.idleRoutes.map((route) => route.vehicleName)).toEqual(['Van 7']);
@@ -68,8 +68,8 @@ describe('buildPlanView', () => {
 
   it('keeps a route color tied to its shift, whatever order routes arrive in', () => {
     const shifts = [shift, { ...shift, id: 21 }];
-    const a = { routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [stop(1, 0)] };
-    const b = { routeId: 2, shiftId: 21, vehicleId: 7, geometry: null, stops: [stop(2, 0)] };
+    const a = { routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, assignmentStatus: 'pending' as const, rejectionReason: null, answerOpen: true, startedAt: null, finishedAt: null, shareToken: 'tok', stops: [stop(1, 0)] };
+    const b = { routeId: 2, shiftId: 21, vehicleId: 7, geometry: null, assignmentStatus: 'pending' as const, rejectionReason: null, answerOpen: true, startedAt: null, finishedAt: null, shareToken: 'tok', stops: [stop(2, 0)] };
     const first = buildPlanView({ ...planBase, score: '', unassignedOrderIds: [], routes: [a, b] }, { ...lookups, shifts }, 'America/Toronto');
     const second = buildPlanView({ ...planBase, score: '', unassignedOrderIds: [], routes: [b, a] }, { ...lookups, shifts }, 'America/Toronto');
     expect(first.routes[1].fill).toBe(ROUTE_COLORS[1].fill);
@@ -77,7 +77,7 @@ describe('buildPlanView', () => {
   });
 
   it('falls back to what the plan itself says when an order is gone', () => {
-    const plan: Plan = { ...planBase, score: '', unassignedOrderIds: [99], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, stops: [stop(99, 0)] }] };
+    const plan: Plan = { ...planBase, score: '', unassignedOrderIds: [99], routes: [{ routeId: 1, shiftId: 20, vehicleId: 7, geometry: null, assignmentStatus: 'pending' as const, rejectionReason: null, answerOpen: true, startedAt: null, finishedAt: null, shareToken: 'tok', stops: [stop(99, 0)] }] };
     const view = buildPlanView(plan, lookups, 'America/Toronto');
     expect(view.routes[0].stops[0].customerName).toBe('Order #99');
     expect(view.routes[0].stops[0].address).toBe('raw');

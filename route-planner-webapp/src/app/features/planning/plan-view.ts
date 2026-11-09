@@ -60,6 +60,7 @@ export interface RouteView {
   capacityKg: number | null;
   loadShare: number | null;
   path: [number, number][] | null;  // road path as [lng, lat], or null to join stops with straight lines
+  shareToken: string | null;        // null on plans saved in the browser before the API returned it
 }
 
 export interface PlanView {
@@ -116,6 +117,7 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
     const capacityKg = vehicle?.capacityKg ?? null;
     return {
       routeId: route.routeId,
+      shareToken: route.shareToken ?? null,
       shiftId: route.shiftId,
       vehicleName: vehicle?.name ?? shift?.vehicleName ?? `Vehicle #${route.vehicleId}`,
       driverName: shift?.driverName ?? null,

@@ -165,6 +165,14 @@ public class Order extends BaseEntity {
         this.status = OrderStatus.planned;
     }
 
+    // The driver started the route this order is on
+    public void markOutForDelivery() {
+        if (status != OrderStatus.planned) {
+            throw new ConflictException("Order " + getId() + " is " + status + ", not planned");
+        }
+        this.status = OrderStatus.out_for_delivery;
+    }
+
     public void cancel() {
         this.status = OrderStatus.cancelled;
     }

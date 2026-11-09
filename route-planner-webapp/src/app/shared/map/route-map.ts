@@ -115,6 +115,8 @@ export class RouteMap {
       for (const stop of route.stops) {
         addMarker(stopElement(stop, route.fill, route.ink, false), route.id, stop.longitude, stop.latitude, stop);
       }
+      // The share page has a road path but no pins to frame
+      for (const point of route.path ?? []) bounds.extend(point);
     }
     // untracked: reading highlighted() here would make the draw effect rebuild every marker on each hover
     this.setLines(routes, untracked(this.highlighted));

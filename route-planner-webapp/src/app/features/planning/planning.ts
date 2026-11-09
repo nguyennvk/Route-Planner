@@ -48,7 +48,9 @@ export class Planning {
   // list above. This loads them back for names and pins. params returning undefined keeps the resource idle.
   protected readonly plannedOrders = rxResource({
     params: () => (this.saved()?.plan.status === 'published' ? { id: this.ctx.id() } : undefined),
-    stream: ({ params: { id } }) => fetchAll((page) => this.api.orders(id, { status: 'planned', page, size: MAX_PAGE_SIZE })),
+    // Once a driver starts a route its orders move from planned to out_for_delivery, so fetch both
+    stream: ({ params: { id } }) => forkJoin((['planned', 'out_for_delivery'] as const).map((status) =>
+      fetchAll((page) => this.api.orders(id, { status, page, size: MAX_PAGE_SIZE })))).pipe(map((lists) => lists.flat())),
   });
 
   // Orders on a published plan are planned now. Hiding them here rather than reloading keeps them in the
@@ -222,6 +224,23 @@ export class Planning {
         this.solveError.set(errorMessage(error));
       },
     });
+  }
+
+  // The driver can open /route/{token} without logging in and accept or turn down the route there
+  protected readonly copied = signal<number | null>(null);
+  private copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  protected copyDriverLink(route: RouteView): void {
+    const link = `${location.origin}/route/${route.shareToken}`;
+    navigator.clipboard.writeText(link).then(
+      () => {
+        this.copied.set(route.routeId);
+        clearTimeout(this.copiedTimer);
+        this.copiedTimer = setTimeout(() => this.copied.set(null), 2500);
+      },
+      // Clipboard access can be refused (permissions, non-HTTPS host); the link is still one click away
+      () => window.open(link, '_blank', 'noopener'),
+    );
   }
 
   protected openPublish(): void {

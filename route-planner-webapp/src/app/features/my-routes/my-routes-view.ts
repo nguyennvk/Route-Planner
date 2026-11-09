@@ -1,4 +1,4 @@
-import { Address, Depot, PlanRoute, Vehicle } from '../../core/models';
+import { Address, AssignmentStatus, Depot, PlanRoute, Vehicle } from '../../core/models';
 import { companyLocalToInstant, dateInZone } from '../../core/time';
 import { decodePath } from '../planning/plan-view';
 
@@ -24,6 +24,11 @@ export interface DriverRouteView {
   path: [number, number][] | null;
   lateCount: number;
   unplacedCount: number;          // stops with no pin, listed but not on the map
+  assignmentStatus: AssignmentStatus;
+  rejectionReason: string | null;
+  answerOpen: boolean;
+  startedAt: string | null;       // company wall clock, as the API sends it
+  finishedAt: string | null;
 }
 
 export interface DriverLookups {
@@ -72,6 +77,11 @@ export function buildDriverRoutes(routes: PlanRoute[], { vehicles, depots, addre
       path: route.geometry ? decodePath(route.geometry) : null,
       lateCount: stops.filter((stop) => stop.minutesLate > 0).length,
       unplacedCount: stops.filter((stop) => stop.latitude === null).length,
+      assignmentStatus: route.assignmentStatus,
+      rejectionReason: route.rejectionReason,
+      answerOpen: route.answerOpen,
+      startedAt: route.startedAt,
+      finishedAt: route.finishedAt,
     };
   });
 }

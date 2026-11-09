@@ -10,7 +10,7 @@ const depot = { id: 3, name: 'Main', address: address(9, 'Depot St') } as Depot;
 const stop = (stopId: number, sequence: number, name: string, arrival: string, minutesLate = 0) => ({
   stopId, sequence, orderId: stopId, name, arrivalTime: arrival, departureTime: arrival.replace(/:00:00$/, ':05:00'), minutesLate,
 });
-const route = (routeId: number, vehicleId: number, stops: PlanRoute['stops']): PlanRoute => ({ routeId, shiftId: 1, vehicleId, stops, geometry: null });
+const route = (routeId: number, vehicleId: number, stops: PlanRoute['stops']): PlanRoute => ({ routeId, shiftId: 1, vehicleId, stops, geometry: null, assignmentStatus: 'pending', rejectionReason: null, answerOpen: true, startedAt: null, finishedAt: null, shareToken: `t${routeId}` });
 
 describe('buildDriverRoutes', () => {
   const lookups = { vehicles: [vehicle], depots: [depot], addresses: [address(1, '1 Main St', '1 Main St, Toronto, ON'), address(2, '2 King St')] };

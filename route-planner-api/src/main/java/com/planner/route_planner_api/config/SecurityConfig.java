@@ -43,6 +43,12 @@ public class SecurityConfig {
                     "/api/v1/auth/logout").permitAll()
                 .requestMatchers("/error", "/actuator/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/shared/**").permitAll()   // share links: the token is the permission
+                // Only the driver's actions on their route; any other POST under /shared still needs a login
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/shared/routes/*/accept",
+                    "/api/v1/shared/routes/*/reject",
+                    "/api/v1/shared/routes/*/start",
+                    "/api/v1/shared/routes/*/finish").permitAll()
                 .anyRequest().authenticated()
             ).oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
         return http.build();

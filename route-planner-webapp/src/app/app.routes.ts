@@ -7,6 +7,8 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', title: 'Route Scheduler: delivery routes from your orders and shifts', loadComponent: () => import('./features/landing/landing').then((m) => m.Landing) },
   { path: 'login', title: 'Log in · Route Scheduler', canActivate: [requireLogout], loadComponent: () => import('./features/auth/login').then((m) => m.Login) },
   { path: 'register', title: 'Create account · Route Scheduler', canActivate: [requireLogout], loadComponent: () => import('./features/auth/register').then((m) => m.Register) },
+  // The driver's share link: deliberately no guard, the token in the URL is the permission
+  { path: 'route/:token', title: 'Your route · Route Scheduler', loadComponent: () => import('./features/shared-route/shared-route').then((m) => m.SharedRoute) },
   { path: 'app', pathMatch: 'full', title: 'Companies · Route Scheduler', canActivate: [requireLogin], loadComponent: () => import('./features/companies/company-list').then((m) => m.CompanyList) },
   {
     path: 'app/:companyId',

@@ -214,6 +214,9 @@ export interface PlanStop {
 }
 
 // RouteResponse.java: what a plan holds per vehicle, and what GET /drivers/me/routes lists for a driver
+// The driver's answer to a published route; they can change it until the route starts
+export type AssignmentStatus = 'pending' | 'accepted' | 'rejected';
+
 export interface PlanRoute {
   routeId: number;
   shiftId: number;
@@ -221,6 +224,12 @@ export interface PlanRoute {
   stops: PlanStop[];
   // OSRM encoded polyline (precision 5) of the road path, depot to depot; null when OSRM couldn't route it
   geometry: string | null;
+  assignmentStatus: AssignmentStatus;
+  rejectionReason: string | null;
+  answerOpen: boolean;                         // false once the route started or finished; the answer is then final
+  startedAt: string | null;                    // company wall clock, like stop times; null until the driver starts
+  finishedAt: string | null;
+  shareToken: string;                          // opens /route/{token} without logging in
 }
 
 export interface Plan {

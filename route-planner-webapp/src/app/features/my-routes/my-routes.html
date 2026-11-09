@@ -9,7 +9,11 @@
   <ng-template #routeLink let-route>
     <a class="card pick-route" [routerLink]="[]" [queryParams]="{ route: route.routeId }"
        [class.active]="route.routeId === selected()?.routeId" [attr.aria-current]="route.routeId === selected()?.routeId ? 'true' : null">
-      <strong>{{ dayLabel(route.date) }}</strong>
+      <span class="pick-head"><strong>{{ dayLabel(route.date) }}</strong>
+        @if (route.finishedAt) { <span class="badge badge-ok">Finished</span> }
+        @else if (route.startedAt) { <span class="badge badge-info">In progress</span> }
+        @else if (route.assignmentStatus === 'pending') { <span class="badge badge-warn">Needs answer</span> }
+        @else if (route.assignmentStatus === 'rejected') { <span class="badge">Turned down</span> }</span>
       <span class="small muted">{{ route.vehicleName }}, {{ route.stops.length }} {{ route.stops.length === 1 ? 'stop' : 'stops' }}</span>
       <span class="mono small">{{ time(route.firstArrival) }} – {{ time(route.lastDeparture) }}</span>
     </a>
@@ -56,6 +60,13 @@
                 @if (route.lateCount > 0) { <span class="badge badge-danger">{{ route.lateCount }} planned late</span> }
               </p>
             </div>
+
+            <app-route-actions [routeId]="route.routeId" [status]="route.assignmentStatus" [rejectionReason]="route.rejectionReason"
+                               [answerOpen]="route.answerOpen" [startedAt]="route.startedAt" [finishedAt]="route.finishedAt"
+                               [busy]="acting() === route.routeId"
+                               [error]="actionError()?.routeId === route.routeId ? actionError()!.message : null"
+                               (accept)="accept(route.routeId)" (reject)="reject(route.routeId, $event)"
+                               (start)="start(route.routeId)" (finish)="finish(route.routeId)" />
 
             <app-route-map [routes]="mapRoutes()" [depots]="mapDepots()" />
             @if (route.unplacedCount > 0) {

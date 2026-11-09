@@ -1,5 +1,7 @@
 package com.planner.route_planner_api.feature.drivers;
 
+import com.planner.route_planner_api.feature.vehicles.VehicleLastPosition;
+import com.planner.route_planner_api.feature.vehicles.VehicleLastPositionRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.drivers.dto.DriverRejectRequest;
+import com.planner.route_planner_api.feature.drivers.dto.PositionRequest;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
@@ -31,15 +34,18 @@ public class DriverService {
 
     private final RouteRepository routeRepository;
     private final RouteStopRepository routeStopRepository;
+    private final VehicleLastPositionRepository vehicleLastPositionRepository;
     private final CompanyAccess companyAccess;
 
     public DriverService(
         RouteRepository routeRepository,
         RouteStopRepository routeStopRepository,
+        VehicleLastPositionRepository vehicleLastPositionRepository,
         CompanyAccess companyAccess
     ) {
         this.routeRepository = routeRepository;
         this.routeStopRepository = routeStopRepository;
+        this.vehicleLastPositionRepository = vehicleLastPositionRepository;
         this.companyAccess = companyAccess;
     }
 
@@ -120,6 +126,16 @@ public class DriverService {
     @Transactional
     public RouteResponse finishRouteByToken(String token) {
         return finish(findSharedRoute(token));
+    }
+
+    @Transactional
+    public void postDriverPosition(Long userId, Long routeId, PositionRequest request) {
+        Route route = findOwnRoute(userId, routeId);
+        route.requireInProgress();
+        vehicleLastPositionRepository.findById(route.getVehicle().getId())
+            .ifPresentOrElse(
+                last -> last.moveTo(route, request.latitude(), request.longitude(), request.speedKmh()),
+                () -> vehicleLastPositionRepository.save(new VehicleLastPosition(route, request.latitude(), request.longitude(), request.speedKmh())));
     }
 
     // Orders cancelled after publishing stay cancelled; the rest are now on the road

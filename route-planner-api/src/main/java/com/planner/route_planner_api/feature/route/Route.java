@@ -145,6 +145,12 @@ public class Route {
         }
     }
 
+    public void requireInProgress() {
+        if (this.startedAt == null) {
+            throw new ConflictException("Start the route before finishing it");
+        }
+    }
+
     public void setGeometry(String geometry){
         this.geometry = geometry;
     }

@@ -2,17 +2,23 @@ package com.planner.route_planner_api.feature.drivers;
 
 import com.planner.route_planner_api.feature.vehicles.VehicleLastPosition;
 import com.planner.route_planner_api.feature.vehicles.VehicleLastPositionRepository;
+
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
+import com.planner.route_planner_api.common.time.ZonedTime;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.drivers.dto.DriverRejectRequest;
+import com.planner.route_planner_api.feature.drivers.dto.PositionMessage;
 import com.planner.route_planner_api.feature.drivers.dto.PositionRequest;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
@@ -36,17 +42,20 @@ public class DriverService {
     private final RouteStopRepository routeStopRepository;
     private final VehicleLastPositionRepository vehicleLastPositionRepository;
     private final CompanyAccess companyAccess;
+    private final SimpMessagingTemplate simpMessagingTemplate;
 
     public DriverService(
         RouteRepository routeRepository,
         RouteStopRepository routeStopRepository,
         VehicleLastPositionRepository vehicleLastPositionRepository,
-        CompanyAccess companyAccess
+        CompanyAccess companyAccess,
+        SimpMessagingTemplate simpMessagingTemplate
     ) {
         this.routeRepository = routeRepository;
         this.routeStopRepository = routeStopRepository;
         this.vehicleLastPositionRepository = vehicleLastPositionRepository;
         this.companyAccess = companyAccess;
+        this.simpMessagingTemplate = simpMessagingTemplate;
     }
 
     // The logged-in driver's routes, earliest first
@@ -132,10 +141,28 @@ public class DriverService {
     public void postDriverPosition(Long userId, Long routeId, PositionRequest request) {
         Route route = findOwnRoute(userId, routeId);
         route.requireInProgress();
-        vehicleLastPositionRepository.findById(route.getVehicle().getId())
-            .ifPresentOrElse(
-                last -> last.moveTo(route, request.latitude(), request.longitude(), request.speedKmh()),
-                () -> vehicleLastPositionRepository.save(new VehicleLastPosition(route, request.latitude(), request.longitude(), request.speedKmh())));
+        Optional<VehicleLastPosition> existing = vehicleLastPositionRepository.findById(route.getVehicle().getId());
+        VehicleLastPosition position;
+        if (existing.isPresent()) {
+            position = existing.get();
+            position.moveTo(route, request.latitude(), request.longitude(), request.speedKmh());
+        } else {
+            position = vehicleLastPositionRepository.save(
+                new VehicleLastPosition(route, request.latitude(), request.longitude(), request.speedKmh()));
+        }
+        ZoneId zone = route.getPlan().getCompany().zoneId();
+
+        // Broadcast to the subscribers
+        simpMessagingTemplate.convertAndSend(
+            "/topic/routes/" + routeId + "/position",
+            new PositionMessage(
+                routeId, 
+                position.getLatitude(), 
+                position.getLongitude(), 
+                position.getSpeedKmh(),
+                ZonedTime.toLocalDateTime(position.getRecordedAt(), zone)
+            )
+        );
     }
 
     // Orders cancelled after publishing stay cancelled; the rest are now on the road

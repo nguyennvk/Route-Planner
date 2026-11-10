@@ -2,9 +2,6 @@ package com.planner.route_planner_api.feature.vehicles;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.ZoneId;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -35,7 +32,7 @@ public class VehicleLastPosition {
     private Long vehicleId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "route_id", nullable = false)
+    @JoinColumn(name = "route_id")
     private Route route;
 
     @JdbcTypeCode(SqlTypes.GEOGRAPHY)
@@ -58,22 +55,18 @@ public class VehicleLastPosition {
         this.recordedAt = Instant.now();
     }
 
-    public void setLocation(Double latitude, Double longitude) {
-        this.location = GEOMETRY.createPoint(new Coordinate(longitude, latitude));
-        this.recordedAt = Instant.now();
-    }
-
-    public void setPosition(Double latitude, Double longitude, BigDecimal speedKmh) {
-        this.location = GEOMETRY.createPoint(new Coordinate(longitude, latitude));
-        this.speedKmh = speedKmh;
-        this.recordedAt = Instant.now();
-    }
     public void moveTo(Route route, Double latitude, Double longitude, BigDecimal speedKmh) {
-        if (recordedAt.isBefore(this.recordedAt)) return;
         this.route = route;
         this.location = GEOMETRY.createPoint(new Coordinate(longitude, latitude));
         this.speedKmh = speedKmh;
         this.recordedAt = Instant.now();
     }
 
+    public Double getLatitude() {
+        return this.location.getY();
+    }
+
+    public Double getLongitude() {
+        return this.location.getX();
+    }
 }

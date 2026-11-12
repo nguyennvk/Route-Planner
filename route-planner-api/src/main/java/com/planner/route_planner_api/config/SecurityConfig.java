@@ -74,7 +74,7 @@ public class SecurityConfig {
         // Define your allowed origins
         configuration.setAllowedOrigins(List.of("http://localhost:4200", "https://localhost:4200", props.baseUrl()));
         configuration.setAllowedOriginPatterns(props.allowedOrigins());
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

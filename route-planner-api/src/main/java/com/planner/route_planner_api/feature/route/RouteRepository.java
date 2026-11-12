@@ -25,4 +25,12 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
 
     @EntityGraph(attributePaths = {"plan", "plan.company"})
     Optional<Route> findByShareToken(String shareToken);
+
+    // Another route this driver / vehicle has started and not finished. Plan and vehicle are loaded for the 409 message.
+    // The partial unique indexes from V5 guarantee there is at most one.
+    @EntityGraph(attributePaths = {"plan", "vehicle"})
+    Optional<Route> findFirstByDriverIdAndIdNotAndStartedAtIsNotNullAndFinishedAtIsNull(Long driverId, Long routeId);
+
+    @EntityGraph(attributePaths = {"plan", "vehicle"})
+    Optional<Route> findFirstByVehicleIdAndIdNotAndStartedAtIsNotNullAndFinishedAtIsNull(Long vehicleId, Long routeId);
 }

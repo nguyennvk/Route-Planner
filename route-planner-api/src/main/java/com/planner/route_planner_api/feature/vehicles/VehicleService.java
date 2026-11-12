@@ -9,13 +9,16 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.planner.route_planner_api.common.error.ForbiddenException;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
 import com.planner.route_planner_api.common.web.PageResponse;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.companies.CompanyMember;
+import com.planner.route_planner_api.feature.companies.MemberRole;
 import com.planner.route_planner_api.feature.depots.Depot;
 import com.planner.route_planner_api.feature.depots.DepotRepository;
 import com.planner.route_planner_api.feature.vehicles.vehicle.dto.UpdateVehicleRequest;
+import com.planner.route_planner_api.feature.vehicles.vehicle.dto.VehiclePositionResponse;
 import com.planner.route_planner_api.feature.vehicles.vehicle.dto.VehicleRequest;
 import com.planner.route_planner_api.feature.vehicles.vehicle.dto.VehicleResponse;
 
@@ -27,15 +30,18 @@ public class VehicleService {
     private final VehicleRepository vehicleRepository;
     private final DepotRepository depotRepository;
     private final CompanyAccess companyAccess;
+    private final VehicleLastPositionRepository vehicleLastPositionRepository;
 
     public VehicleService(
             VehicleRepository vehicleRepository,
             DepotRepository depotRepository,
-            CompanyAccess companyAccess
+            CompanyAccess companyAccess,
+            VehicleLastPositionRepository vehicleLastPositionRepository
         ){
         this.vehicleRepository = vehicleRepository;
         this.depotRepository = depotRepository;
         this.companyAccess = companyAccess;
+        this.vehicleLastPositionRepository = vehicleLastPositionRepository;
     }
 
     @Transactional
@@ -75,6 +81,23 @@ public class VehicleService {
     public VehicleResponse getVehicle(Long userId, Long vehicleId){
         Vehicle vehicle = findVehicleForMember(vehicleId, userId);
         return VehicleResponse.from(vehicle);
+    }
+
+    // The latest position a driver sent for this vehicle. Owners and dispatchers only, like the
+    // websocket topic (TopicAccess): drivers don't get to follow each other's vans
+    @Transactional(readOnly = true)
+    public VehiclePositionResponse getLastPosition(Long userId, Long vehicleId){
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+            .orElseThrow(() -> new ResourceNotFoundException("Vehicle", vehicleId));
+        CompanyMember membership = companyAccess.findActiveMember(vehicle.getCompany().getId(), userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Vehicle", vehicleId));
+        if (membership.getRole() == MemberRole.driver) {
+            throw new ForbiddenException("Only owners and dispatchers can see vehicle positions");
+        }
+        // No row yet: no driver has sent a position for this vehicle
+        VehicleLastPosition position = vehicleLastPositionRepository.findById(vehicleId)
+            .orElseThrow(() -> new ResourceNotFoundException("Position for vehicle", vehicleId));
+        return VehiclePositionResponse.from(position, vehicle.getCompany().zoneId());
     }
 
     @Transactional

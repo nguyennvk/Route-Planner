@@ -14,6 +14,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.planner.route_planner_api.common.error.ConflictException;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
 import com.planner.route_planner_api.common.time.ZonedTime;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
@@ -165,8 +166,29 @@ public class DriverService {
         );
     }
 
+    // One driver drives one van at a time, and a van is on one route at a time. A second open route is almost
+    // always one somebody forgot to finish; it would also never get positions (the phone tracks one route)
+    // and its orders would stay out_for_delivery. The message names the route, so the driver can finish it.
+    private void requireNoOtherActiveRoute(Route route) {
+        if (route.getDriver() != null) {
+            routeRepository.findFirstByDriverIdAndIdNotAndStartedAtIsNotNullAndFinishedAtIsNull(route.getDriver().getId(), route.getId())
+                .ifPresent(other -> {
+                    throw new ConflictException("Finish your route for " + other.getPlan().getPlanDate()
+                        + " (" + other.getVehicle().getName() + ") before starting this one");
+                });
+        }
+        routeRepository.findFirstByVehicleIdAndIdNotAndStartedAtIsNotNullAndFinishedAtIsNull(route.getVehicle().getId(), route.getId())
+            .ifPresent(other -> {
+                throw new ConflictException(other.getVehicle().getName() + " is still on a route in progress for "
+                    + other.getPlan().getPlanDate() + "; that route has to finish first");
+            });
+    }
+
     // Orders cancelled after publishing stay cancelled; the rest are now on the road
     private RouteResponse start(Route route) {
+        // Before route.start(): Hibernate flushes pending changes before running a query, so checking after it
+        // would flush this route as started, hit V5's unique index and give a vague 409 instead of these messages
+        requireNoOtherActiveRoute(route);
         List<RouteStop> stops = routeStopRepository.findByRoute(route);
         route.start();
         stops.stream()

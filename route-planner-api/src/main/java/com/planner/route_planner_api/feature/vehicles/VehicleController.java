@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.planner.route_planner_api.common.web.PageResponse;
 import com.planner.route_planner_api.feature.vehicles.vehicle.dto.UpdateVehicleRequest;
+import com.planner.route_planner_api.feature.vehicles.vehicle.dto.VehiclePositionResponse;
 import com.planner.route_planner_api.feature.vehicles.vehicle.dto.VehicleRequest;
 import com.planner.route_planner_api.feature.vehicles.vehicle.dto.VehicleResponse;
 
@@ -68,6 +69,17 @@ public class VehicleController {
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
         return vehicleService.getVehicle(userId, vehicleId);
+    }
+
+    // Where the vehicle was last seen; live updates after this come over /topic/routes/{routeId}/position
+    @GetMapping("/vehicles/{vehicleId}/position")
+    @ResponseStatus(HttpStatus.OK)
+    public VehiclePositionResponse getLastPosition(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long vehicleId
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return vehicleService.getLastPosition(userId, vehicleId);
     }
 
     @PatchMapping("/vehicles/{vehicleId}")

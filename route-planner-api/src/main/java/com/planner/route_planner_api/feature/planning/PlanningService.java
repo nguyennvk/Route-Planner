@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.planner.route_planner_api.common.error.ConflictException;
+import com.planner.route_planner_api.common.error.ForbiddenException;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
 import com.planner.route_planner_api.common.error.ServiceUnavailableException;
 import com.planner.route_planner_api.common.time.ZonedTime;
@@ -30,6 +31,7 @@ import com.planner.route_planner_api.feature.auth.User;
 import com.planner.route_planner_api.feature.companies.Company;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.companies.CompanyMember;
+import com.planner.route_planner_api.feature.companies.MemberRole;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderRepository;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
@@ -47,9 +49,11 @@ import com.planner.route_planner_api.feature.route.RouteRepository;
 import com.planner.route_planner_api.feature.route.RouteStop;
 import com.planner.route_planner_api.feature.route.RouteStopRepository;
 import com.planner.route_planner_api.feature.vehicles.Vehicle;
+import com.planner.route_planner_api.feature.vehicles.VehicleLastPositionRepository;
 import com.planner.route_planner_api.feature.vehicles.VehicleRepository;
 import com.planner.route_planner_api.feature.vehicles.VehicleShift;
 import com.planner.route_planner_api.feature.vehicles.VehicleShiftRepository;
+import com.planner.route_planner_api.feature.vehicles.vehicle.dto.VehiclePositionResponse;
 
 import ai.timefold.solver.core.api.solver.SolverJob;
 import ai.timefold.solver.core.api.solver.SolverManager;
@@ -69,6 +73,7 @@ public class PlanningService {
     private final VehicleShiftRepository vehicleShiftRepository;
     private final OrderRepository orderRepository;
     private final OsrmAPI osrmAPI;
+    private final VehicleLastPositionRepository vehicleLastPositionRepository;
 
     private static final Logger log = LoggerFactory.getLogger(PlanningService.class);
 
@@ -84,8 +89,10 @@ public class PlanningService {
         CompanyAccess companyAccess,
         VehicleShiftRepository vehicleShiftRepository,
         OrderRepository orderRepository,
-        OsrmAPI osrmAPI
+        OsrmAPI osrmAPI,
+        VehicleLastPositionRepository vehicleLastPositionRepository
     ) {
+        this.vehicleLastPositionRepository = vehicleLastPositionRepository;
         this.solverManager = solverManager;
         this.addressRepository = addressRepository;
         this.vehicleRepository = vehicleRepository;
@@ -177,6 +184,23 @@ public class PlanningService {
 
     // Short and DB-only, so a transaction around the whole method is fine. It works here (unlike on a
     // private method) because the controller calls it from outside, through Spring's proxy
+    // Snapshot for the planner's map: where each van on a route in progress was last seen.
+    // Live updates after this come over /topic/routes/{routeId}/position. Owners and dispatchers only, like that topic.
+    @Transactional(readOnly = true)
+    public List<VehiclePositionResponse> activePositions(Long userId, Long planId) {
+        Plan plan = planRepository.findById(planId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan", planId));
+        CompanyMember member = companyAccess.findActiveMember(plan.getCompany().getId(), userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan", planId));
+        if (member.getRole() == MemberRole.driver) {
+            throw new ForbiddenException("Only owners and dispatchers can see vehicle positions");
+        }
+        ZoneId zone = plan.getCompany().zoneId();
+        return vehicleLastPositionRepository.findActiveByPlanId(planId).stream()
+            .map(position -> VehiclePositionResponse.from(position, zone))
+            .toList();
+    }
+
     @Transactional
     public PlanResponse publishPlan(Long userId, Long planId, PlanPublishRequest request) {
         Plan plan = planRepository.findById(planId)

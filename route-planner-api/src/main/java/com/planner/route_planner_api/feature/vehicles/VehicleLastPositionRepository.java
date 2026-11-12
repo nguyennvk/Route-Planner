@@ -1,6 +1,7 @@
 package com.planner.route_planner_api.feature.vehicles;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,4 +17,6 @@ public interface VehicleLastPositionRepository extends JpaRepository<VehicleLast
           and p.route.finishedAt is null
         """)
     List<VehicleLastPosition> findActiveByPlanId(Long planId);
+
+    Optional<VehicleLastPosition> findById(Long vehicleId);
 }

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -76,6 +77,9 @@ public class Order extends BaseEntity {
 
     @Column
     private String notes;
+
+    @Column(name = "tracking_token", unique = true)
+    private String trackingToken;
 
     // cascade ALL: lines are saved/updated with the order. orphanRemoval: a line taken out of this list is deleted.
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -163,6 +167,7 @@ public class Order extends BaseEntity {
             throw new ConflictException("Order " + getId() + " is " + status + ", not pending");
         }
         this.status = OrderStatus.planned;
+        this.trackingToken = UUID.randomUUID().toString();
     }
 
     // The driver started the route this order is on

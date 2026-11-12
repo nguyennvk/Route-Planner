@@ -4,12 +4,13 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-// Only the road path is kept; waypoints, legs, durations and the rest are skipped
+// Only the road path and its driving time are kept; waypoints, legs and the rest are skipped
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record OsrmRouteResponse(
         String code,
         List<Route> routes
 ) {
+        // duration: seconds of driving, no traffic, parking or stops
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record Route(String geometry){}
+        public record Route(String geometry, Double duration){}
 }

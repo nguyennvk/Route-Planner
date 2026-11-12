@@ -2,9 +2,12 @@ package com.planner.route_planner_api.feature.orders;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
+import com.planner.route_planner_api.feature.customers.Customer;
 
 // JpaSpecificationExecutor adds findAll(Specification, Pageable): a query built from
 // only the filters the client sent (see OrderService.listOrders)
@@ -17,5 +20,7 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     List<Order> findByCompanyIdAndIdIn(Long companyId, Collection<Long> ids);
     
     List<Order> findByCompanyIdAndStatusAndIdIn(Long companyId, OrderStatus status, Collection<Long> ids);
+
+    Optional<Order> findByTrackingToken(String trackToken);
 
 }

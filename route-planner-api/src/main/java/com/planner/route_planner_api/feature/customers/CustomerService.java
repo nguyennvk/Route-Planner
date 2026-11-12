@@ -1,6 +1,9 @@
 package com.planner.route_planner_api.feature.customers;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -12,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.planner.route_planner_api.common.error.ConflictException;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
+import com.planner.route_planner_api.common.error.ServiceUnavailableException;
 import com.planner.route_planner_api.common.web.PageResponse;
 import com.planner.route_planner_api.feature.addresses.Address;
 import com.planner.route_planner_api.feature.addresses.AddressRepository;
@@ -19,7 +23,19 @@ import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.companies.CompanyMember;
 import com.planner.route_planner_api.feature.customers.dto.CustomerRequest;
 import com.planner.route_planner_api.feature.customers.dto.CustomerResponse;
+import com.planner.route_planner_api.feature.customers.dto.TrackingResponse;
 import com.planner.route_planner_api.feature.customers.dto.UpdateCustomerRequest;
+import com.planner.route_planner_api.feature.orders.Order;
+import com.planner.route_planner_api.feature.orders.OrderRepository;
+import com.planner.route_planner_api.feature.planning.PlanStatus;
+import com.planner.route_planner_api.feature.planning.geo_provider.OsrmAPI;
+import com.planner.route_planner_api.feature.planning.geo_provider.OsrmRouteResponse;
+import com.planner.route_planner_api.feature.route.Route;
+import com.planner.route_planner_api.feature.route.RouteStop;
+import com.planner.route_planner_api.feature.route.RouteStopRepository;
+import com.planner.route_planner_api.feature.route.StopStatus;
+import com.planner.route_planner_api.feature.vehicles.VehicleLastPosition;
+import com.planner.route_planner_api.feature.vehicles.VehicleLastPositionRepository;
 
 import jakarta.persistence.criteria.Predicate;
 
@@ -30,15 +46,27 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final AddressRepository addressRepository;
+    private final OrderRepository orderRepository;
+    private final RouteStopRepository routeStopRepository;
+    private final VehicleLastPositionRepository vehicleLastPositionRepository;
     private final CompanyAccess companyAccess;
+    private final OsrmAPI osrmAPI;
 
     public CustomerService(
             CustomerRepository customerRepository,
             AddressRepository addressRepository,
-            CompanyAccess companyAccess
+            OrderRepository orderRepository,
+            RouteStopRepository routeStopRepository,
+            VehicleLastPositionRepository vehicleLastPositionRepository,
+            CompanyAccess companyAccess,
+            OsrmAPI osrmAPI
         ){
+        this.osrmAPI = osrmAPI;
         this.customerRepository = customerRepository;
         this.addressRepository = addressRepository;
+        this.orderRepository = orderRepository;
+        this.routeStopRepository = routeStopRepository;
+        this.vehicleLastPositionRepository = vehicleLastPositionRepository;
         this.companyAccess = companyAccess;
     }
 
@@ -116,6 +144,108 @@ public class CustomerService {
             customer.changeDefaultAddress(findCompanyAddress(companyId, request.defaultAddressId()));
         }
         return CustomerResponse.from(customer);
+    }
+
+    @Transactional(readOnly = true)
+    public TrackingResponse trackOrder(String trackToken) {
+        Order order = orderRepository.findByTrackingToken(trackToken).orElseThrow(
+            () -> new ResourceNotFoundException("Order", trackToken)
+        );
+        // The stop on the published plan, not a draft's copy (completed: the plan is over but still tracked)
+        RouteStop routeStop = routeStopRepository.findForTracking(order.getId(), List.of(PlanStatus.published, PlanStatus.completed))
+            .stream().findFirst()
+            .orElseThrow(() -> new ResourceNotFoundException("Order", trackToken));   // not sent to a driver yet
+        Route route = routeStop.getRoute();
+        int stopsBefore = routeStopRepository.countByRouteIdAndSequenceLessThanAndStatusIn(
+            route.getId(), routeStop.getSequence(), List.of(StopStatus.pending, StopStatus.arrived));
+        TrackingStage stage = stageOf(routeStop, route, stopsBefore);
+        Instant now = Instant.now();
+
+        // The van's last fix, only if it was sent for this route (a van that moved on to another route isn't this one's).
+        // No fix yet is normal, not an error: the page just has no van to show
+        VehicleLastPosition position = vehicleLastPositionRepository.findById(route.getVehicle().getId())
+            .filter(p -> p.getRoute() != null && p.getRoute().getId().equals(route.getId()))
+            .orElse(null);
+
+        Eta eta = switch (stage) {
+            case next -> nextEta(routeStop, route, position, now);
+            case scheduled, on_the_way -> plannedEta(routeStop, route, now);
+            case arrived, delivered, failed -> Eta.NONE;     // at the door or done: no time to predict
+        };
+        return TrackingResponse.from(routeStop, stage, stopsBefore, eta.start(), eta.end(), position, eta.geometry());
+    }
+
+    // An arrival window, plus the van → customer road path when OSRM gave one
+    private record Eta(Instant start, Instant end, String geometry) {
+        static final Eta NONE = new Eta(null, null, null);
+    }
+
+    // Planned arrivals get a wider window than OSRM's: they're hours old and the day can still slip
+    private static final Duration PLANNED_EARLY = Duration.ofMinutes(10);
+    private static final Duration PLANNED_LATE = Duration.ofMinutes(20);
+    private static final Duration PARKING = Duration.ofMinutes(5);
+
+    // Coming to this customer now: OSRM driving time from the van's last fix, widened for traffic and parking.
+    // No fix yet, or OSRM down: the planned time is still a good answer, so fall back instead of failing.
+    private Eta nextEta(RouteStop stop, Route route, VehicleLastPosition position, Instant now) {
+        Address address = stop.getOrder().getAddress();
+        if (position != null) {
+            try {
+                OsrmRouteResponse.Route path = osrmAPI.routeBetween(
+                    position.getLatitude(), position.getLongitude(), address.getLatitude(), address.getLongitude());
+                if (path.duration() != null) {
+                    Duration drive = Duration.ofSeconds(Math.round(path.duration()));
+                    // +25 % for traffic OSRM doesn't know about, +5 min to park and reach the door
+                    return new Eta(now.plus(drive), now.plus(drive.multipliedBy(5).dividedBy(4)).plus(PARKING), path.geometry());
+                }
+            } catch (ServiceUnavailableException e) {
+                // logged by OsrmAPI; use the plan below
+            }
+        }
+        return plannedEta(stop, route, now);
+    }
+
+    // The solver's planned arrival, moved by however late the route is running, as a window that never starts in the past
+    private Eta plannedEta(RouteStop stop, Route route, Instant now) {
+        if (stop.getPlannedArrival() == null) return Eta.NONE;      // plans saved before planned times existed
+        Instant base = stop.getPlannedArrival().plus(routeDelay(route, now));
+        // The delay only counts finished stops, so a van stuck since then still looks on time; the stop isn't
+        // done, so it can't arrive before now. Without this the window ends before it starts.
+        if (base.isBefore(now)) base = now;
+        Instant start = base.minus(PLANNED_EARLY);
+        return new Eta(start.isBefore(now) ? now : start, base.plus(PLANNED_LATE), null);
+    }
+
+    // How late the route is right now, never negative: an early driver still waits for time windows
+    private Duration routeDelay(Route route, Instant now) {
+        Duration delay;
+        if (route.getStartedAt() == null) {
+            // Not out yet: every minute past the planned start pushes every stop back
+            delay = route.getPlannedStart() == null ? Duration.ZERO : Duration.between(route.getPlannedStart(), now);
+        } else {
+            // Out: the most recently finished stop shows how far behind plan the van is. None finished yet: the start
+            delay = routeStopRepository.findByRoute(route).stream()
+                .filter(s -> s.getActualDeparture() != null && s.getPlannedDeparture() != null)
+                .max(Comparator.comparing(RouteStop::getActualDeparture))
+                .map(s -> Duration.between(s.getPlannedDeparture(), s.getActualDeparture()))
+                .orElseGet(() -> route.getPlannedStart() == null ? Duration.ZERO
+                    : Duration.between(route.getPlannedStart(), route.getStartedAt()));
+        }
+        return delay.isNegative() ? Duration.ZERO : delay;
+    }
+
+    private TrackingStage stageOf(RouteStop stop, Route route, long stopsBefore) {
+        switch (stop.getStatus()) {
+            case delivered: return TrackingStage.delivered;                  // 1. done: success
+            case failed:
+            case skipped:   return TrackingStage.failed;                     // 2. done: not delivered
+            case arrived:   return TrackingStage.arrived;                    // 3. driver is at the door
+            default:        break;                                           // pending: look at the route
+        }
+        if (route.getStartedAt() == null)  return TrackingStage.scheduled;   // 4. van not out yet
+        if (route.getFinishedAt() != null) return TrackingStage.failed;      // 5. route over, this stop never handled
+        return stopsBefore == 0 ? TrackingStage.next                         // 6. coming to you now
+                                : TrackingStage.on_the_way;                  // 7. others first
     }
 
     // Customer exists AND the user owns its company; a non-member gets 404, so ids in other companies stay hidden

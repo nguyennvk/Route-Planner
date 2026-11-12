@@ -98,4 +98,24 @@ public class OsrmAPI {
         return response.routes().get(0).geometry();
     }
 
+    // Road path and driving time between two points, e.g. from a van to a customer.
+    // Throws ServiceUnavailableException like the calls above; callers that can do without it catch that.
+    public OsrmRouteResponse.Route routeBetween(double fromLat, double fromLng, double toLat, double toLng){
+        OsrmRouteResponse response;
+        try {
+            response = restClient.get()
+                .uri("/route/v1/driving/" + fromLng + "," + fromLat + ";" + toLng + "," + toLat + "?overview=full&geometries=polyline")
+                .retrieve()
+                .body(OsrmRouteResponse.class);
+        } catch (RestClientException e) {
+            log.warn("OSRM route request failed", e);
+            throw new ServiceUnavailableException("Travel time is unavailable right now. Try again later.");
+        }
+        if (response == null || !"Ok".equals(response.code())
+                || response.routes() == null || response.routes().isEmpty()) {
+            throw new ServiceUnavailableException("Travel time is unavailable right now. Try again later.");
+        }
+        return response.routes().get(0);
+    }
+
 }

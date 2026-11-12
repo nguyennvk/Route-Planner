@@ -1,9 +1,9 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { Observable, forkJoin } from 'rxjs';
+import { Observable, forkJoin, retry } from 'rxjs';
 import { Api, MAX_PAGE_SIZE, fetchAll } from '../../core/api';
 import { CompanyContext } from '../../core/company-context';
 import { errorMessage } from '../../core/errors';
@@ -85,9 +85,55 @@ export class MyRoutes {
   protected readonly acting = signal<number | null>(null);
   protected readonly actionError = signal<{ routeId: number; message: string } | null>(null);
 
+  // GPS watch for the route being driven. It lives in the open page, so a reload loses it:
+  // the effect below starts it from the route's state (started, not finished) rather than from the Start click.
+  private watchId: number | null = null;
+  private watchedRouteId: number | null = null;
+
+  constructor() {
+    // Re-runs whenever routes() changes: after load, after Start or Finish swaps the route in, after a reload
+    effect(() => {
+      const active = this.routes().find((route) => route.startedAt && !route.finishedAt);
+      this.track(active?.routeId ?? null);
+    });
+    inject(DestroyRef).onDestroy(() => this.track(null));   // leaving the page stops the GPS
+  }
+
+  private track(routeId: number | null): void {
+    if (routeId === this.watchedRouteId) return;            // already watching this route, or nothing to watch
+    if (this.watchId !== null) navigator.geolocation.clearWatch(this.watchId);
+    this.watchId = null;
+    this.watchedRouteId = routeId;
+    if (routeId === null || !('geolocation' in navigator)) return;
+    this.watchId = navigator.geolocation.watchPosition(
+      (position) => this.onFix(position, routeId),
+      (error) => this.onError(error),
+      { enableHighAccuracy: true, maximumAge: 5_000, timeout: 20_000 },
+    );
+  }
+
+  private onFix(position: GeolocationPosition, routeId: number): void {
+    this.api.postDriverPosition(routeId, {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      speedKmh: position.coords.speed === null ? null : position.coords.speed * 3.6,   // m/s → km/h
+    }).pipe(
+      retry({count: 3, delay: 3_000})
+    ).subscribe({
+      error: () => {}
+    });
+
+  }
+
+  private onError(error: GeolocationPositionError): void {
+    console.log("Reject")
+  }
+
   protected accept(routeId: number): void { this.act(routeId, this.api.acceptMyRoute(routeId)); }
   protected reject(routeId: number, reason: string | null): void { this.act(routeId, this.api.rejectMyRoute(routeId, reason)); }
+  // The effect in the constructor starts tracking once the started route comes back
   protected start(routeId: number): void { this.act(routeId, this.api.startMyRoute(routeId)); }
+
   protected finish(routeId: number): void { this.act(routeId, this.api.finishMyRoute(routeId)); }
 
   private act(routeId: number, request: Observable<PlanRoute>): void {

@@ -113,6 +113,9 @@ export class Api {
   rejectMyRoute(routeId: number, reason: string | null) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/reject`, { reason }); }
   startMyRoute(routeId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/start`, null); }
   finishMyRoute(routeId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/finish`, null); }
+  postDriverPosition(routeId: number, position: { latitude: number; longitude: number; speedKmh: number | null }) {
+    return this.http.post<void>(`${API}/drivers/me/routes/${routeId}/position`, position);
+  }
 
   // Share link: no login, the token in the path is the permission
   sharedRoute(token: string) { return this.http.get<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}`); }

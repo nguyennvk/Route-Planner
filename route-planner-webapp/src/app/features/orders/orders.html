@@ -47,6 +47,12 @@
                   <button type="button" class="btn btn-small" (click)="openEdit(order)"><app-icon name="pencil" /> Edit</button>
                   <button type="button" class="btn btn-small btn-danger" (click)="openCancel(order)">Cancel</button>
                 }
+                @if (order.trackingToken) {
+                  <button type="button" class="btn btn-small" (click)="copyTrackingLink(order)"
+                          [attr.aria-label]="'Copy tracking link for order ' + order.id">
+                    <app-icon [name]="copied() === order.id ? 'check' : 'link'" /> {{ copied() === order.id ? 'Copied' : 'Tracking link' }}
+                  </button>
+                }
               </td>
             </tr>
           }

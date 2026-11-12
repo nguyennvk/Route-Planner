@@ -4,7 +4,7 @@ import { ROUTE_COLORS, buildPlanView, parseScore, softCostLabel } from './plan-v
 
 const order = (id: number, weight: number): Order => ({
   id, totalWeightKg: weight, status: 'pending', items: [], windowStart: null, windowEnd: null, windowStrict: false,
-  serviceMinutes: 5, notes: null, createdAt: '',
+  serviceMinutes: 5, notes: null, createdAt: '', trackingToken: null,
   customer: { id, name: `Customer ${id}`, phone: null, email: null, defaultAddress: null, createdAt: '' },
   address: { id, rawAddress: `${id} Main St`, normalizedAddress: null, latitude: 43, longitude: -79, geocodeConfidence: null, geocodeSource: 'geocodio', createdAt: '' },
 });

@@ -181,6 +181,7 @@ export interface Order {
   serviceMinutes: number;
   notes: string | null;
   createdAt: string;
+  trackingToken: string | null;   // the customer's /track/{token} link; set when the order's plan is published
 }
 
 export interface OrderRequest {
@@ -258,4 +259,28 @@ export interface VehiclePosition {
   speedKmh: number | null;
   recordedAt: string;
 
+}
+// Customer tracking (GET /track/{token}, no login). Spelled like the Java enum TrackingStage
+export type TrackingStage = 'scheduled' | 'on_the_way' | 'next' | 'arrived' | 'delivered' | 'failed';
+
+// TrackingResponse.java. Times are LocalDateTime on the company's wall clock, like the rest of the API
+export interface Tracking {
+  stage: TrackingStage;
+  orderStatus: OrderStatus;
+  companyName: string;
+  planDate: string;
+  address: string;
+  latitude: number | null;               // the customer's pin
+  longitude: number | null;
+  windowStart: string | null;            // the window the customer asked for
+  windowEnd: string | null;
+  etaStart: string | null;               // null once arrived, delivered or failed
+  etaEnd: string | null;
+  delayMinutes: number;                  // later than planned; 0 when on time
+  stopsBefore: number;
+  vehicleLatitude: number | null;        // only when the van is coming to this customer (next, arrived)
+  vehicleLongitude: number | null;
+  vehicleRecordedAt: string | null;
+  geometry: string | null;               // van → customer road path, only when next
+  deliveredAt: string | null;
 }

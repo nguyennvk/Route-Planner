@@ -4,7 +4,7 @@ import { EMPTY, Observable, expand, map, reduce } from 'rxjs';
 import {
   Address, AddressSuggestion, Company, Customer, CustomerRequest, Depot, Item, ItemRequest, LoginResponse,
   Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest, PlanRoute,
-  RegisterRequest, Shift, ShiftRequest, Vehicle, VehiclePosition, VehicleRequest, VehicleType,
+  RegisterRequest, Shift, ShiftRequest, Tracking, Vehicle, VehiclePosition, VehicleRequest, VehicleType,
 } from './models';
 
 const API = '/api/v1';
@@ -126,6 +126,9 @@ export class Api {
   rejectSharedRoute(token: string, reason: string | null) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/reject`, { reason }); }
   startSharedRoute(token: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/start`, null); }
   finishSharedRoute(token: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/finish`, null); }
+
+  // Customer's tracking link: no login either, the token is the permission
+  trackOrder(token: string) { return this.http.get<Tracking>(`${API}/track/${encodeURIComponent(token)}`); }
 }
 
 // Follows totalPages for lists a dropdown or the planner needs in full (the API caps a page at 200)

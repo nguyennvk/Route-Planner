@@ -172,12 +172,19 @@ public class CustomerService {
             case scheduled, on_the_way -> plannedEta(routeStop, route, now);
             case arrived, delivered, failed -> Eta.NONE;     // at the door or done: no time to predict
         };
-        return TrackingResponse.from(routeStop, stage, stopsBefore, eta.start(), eta.end(), position, eta.geometry());
+        return TrackingResponse.from(routeStop, stage, stopsBefore, eta.start(), eta.end(), eta.delay(), position, eta.geometry());
     }
 
-    // An arrival window, plus the van → customer road path when OSRM gave one
-    private record Eta(Instant start, Instant end, String geometry) {
-        static final Eta NONE = new Eta(null, null, null);
+    // An arrival window, how much later than planned it is, and the van → customer road path when OSRM gave one
+    private record Eta(Instant start, Instant end, Duration delay, String geometry) {
+        static final Eta NONE = new Eta(null, null, Duration.ZERO, null);
+    }
+
+    // Expected arrival against the solver's plan, never negative: being early isn't news for the customer
+    private static Duration lateness(RouteStop stop, Instant expected) {
+        if (stop.getPlannedArrival() == null) return Duration.ZERO;
+        Duration late = Duration.between(stop.getPlannedArrival(), expected);
+        return late.isNegative() ? Duration.ZERO : late;
     }
 
     // Planned arrivals get a wider window than OSRM's: they're hours old and the day can still slip
@@ -196,7 +203,9 @@ public class CustomerService {
                 if (path.duration() != null) {
                     Duration drive = Duration.ofSeconds(Math.round(path.duration()));
                     // +25 % for traffic OSRM doesn't know about, +5 min to park and reach the door
-                    return new Eta(now.plus(drive), now.plus(drive.multipliedBy(5).dividedBy(4)).plus(PARKING), path.geometry());
+                    Instant arrival = now.plus(drive);
+                    return new Eta(arrival, now.plus(drive.multipliedBy(5).dividedBy(4)).plus(PARKING),
+                        lateness(stop, arrival), path.geometry());
                 }
             } catch (ServiceUnavailableException e) {
                 // logged by OsrmAPI; use the plan below
@@ -213,7 +222,7 @@ public class CustomerService {
         // done, so it can't arrive before now. Without this the window ends before it starts.
         if (base.isBefore(now)) base = now;
         Instant start = base.minus(PLANNED_EARLY);
-        return new Eta(start.isBefore(now) ? now : start, base.plus(PLANNED_LATE), null);
+        return new Eta(start.isBefore(now) ? now : start, base.plus(PLANNED_LATE), lateness(stop, base), null);
     }
 
     // How late the route is right now, never negative: an early driver still waits for time windows

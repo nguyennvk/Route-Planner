@@ -191,5 +191,22 @@ export class Orders {
     });
   }
 
+  // The customer's tracking page (/track/{token}, no login). The owner sends it on; there's no email or SMS yet
+  protected readonly copied = signal<number | null>(null);
+  private copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  protected copyTrackingLink(order: Order): void {
+    const link = `${location.origin}/track/${order.trackingToken}`;
+    navigator.clipboard.writeText(link).then(
+      () => {
+        this.copied.set(order.id);
+        clearTimeout(this.copiedTimer);
+        this.copiedTimer = setTimeout(() => this.copied.set(null), 2500);
+      },
+      // Clipboard access can be refused (permissions, non-HTTPS host); open the page instead so the link can be copied from there
+      () => window.open(link, '_blank', 'noopener'),
+    );
+  }
+
   protected lineControls() { return this.lines.controls; }
 }

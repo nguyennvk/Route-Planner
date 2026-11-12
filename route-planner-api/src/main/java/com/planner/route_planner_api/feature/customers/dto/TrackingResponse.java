@@ -1,5 +1,6 @@
 package com.planner.route_planner_api.feature.customers.dto;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ public record TrackingResponse(
     Double latitude, Double longitude,              // the customer's pin
     LocalDateTime windowStart, LocalDateTime windowEnd,
     LocalDateTime etaStart, LocalDateTime etaEnd,    // company wall clock, like the rest of the API
+    int delayMinutes,                                // how much later than planned the delivery now looks; 0 when on time
     int stopsBefore,
     Double vehicleLatitude, Double vehicleLongitude, // null unless stage is next or arrived
     LocalDateTime vehicleRecordedAt,
@@ -40,6 +42,7 @@ public record TrackingResponse(
         int stopsBefore,
         Instant etaStart,
         Instant etaEnd,
+        Duration delay,
         VehicleLastPosition position,
         String geometry
     ) {
@@ -64,6 +67,7 @@ public record TrackingResponse(
             ZonedTime.toLocalDateTime(order.getWindowEnd(), zone),
             ZonedTime.toLocalDateTime(etaStart, zone),
             ZonedTime.toLocalDateTime(etaEnd, zone),
+            (int) delay.toMinutes(),
             stopsBefore,
             showVehicle ? position.getLatitude() : null,
             showVehicle ? position.getLongitude() : null,

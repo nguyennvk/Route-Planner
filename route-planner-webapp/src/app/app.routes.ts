@@ -9,6 +9,8 @@ export const routes: Routes = [
   { path: 'register', title: 'Create account · Route Scheduler', canActivate: [requireLogout], loadComponent: () => import('./features/auth/register').then((m) => m.Register) },
   // The driver's share link: deliberately no guard, the token in the URL is the permission
   { path: 'route/:token', title: 'Your route · Route Scheduler', loadComponent: () => import('./features/shared-route/shared-route').then((m) => m.SharedRoute) },
+  // The customer's tracking link: no guard either, same reason
+  { path: 'track/:token', title: 'Track your delivery · Route Scheduler', loadComponent: () => import('./features/track-order/track-order').then((m) => m.TrackOrder) },
   { path: 'app', pathMatch: 'full', title: 'Companies · Route Scheduler', canActivate: [requireLogin], loadComponent: () => import('./features/companies/company-list').then((m) => m.CompanyList) },
   {
     path: 'app/:companyId',

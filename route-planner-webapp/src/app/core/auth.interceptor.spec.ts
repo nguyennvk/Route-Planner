@@ -35,6 +35,9 @@ describe('authInterceptor', () => {
 
     http.get('/api/v1/shared/routes/abc').subscribe();
     expect(backend.expectOne('/api/v1/shared/routes/abc').request.headers.has('Authorization')).toBe(false);
+
+    http.get('/api/v1/track/abc').subscribe();
+    expect(backend.expectOne('/api/v1/track/abc').request.headers.has('Authorization')).toBe(false);
   });
 
   it('refreshes once on a 401 and replays the request with the new token', () => {

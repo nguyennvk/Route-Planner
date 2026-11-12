@@ -21,7 +21,8 @@ public record OrderResponse(
     boolean windowStrict,
     int serviceMinutes,
     String notes,
-    Instant createdAt
+    Instant createdAt,
+    String trackingToken        // the customer's /track/{token} link; null until the order's plan is published
 ) {
     public static OrderResponse from(Order order) {
         return new OrderResponse(
@@ -36,7 +37,8 @@ public record OrderResponse(
             order.isWindowStrict(),
             order.getServiceMinutes(),
             order.getNotes(),
-            order.getCreatedAt()
+            order.getCreatedAt(),
+            order.getTrackingToken()
         );
     }
 }

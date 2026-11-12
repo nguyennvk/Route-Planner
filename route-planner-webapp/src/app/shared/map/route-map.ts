@@ -30,6 +30,9 @@ export class RouteMap {
   readonly looseStops = input<MapStop[]>([]);
   readonly depots = input<MapDepot[]>([]);
   readonly vehicles = input<MapVehicle[]>([]);
+  // Frame vans together with the stops. Off for the planner (vans move all day and the camera would chase them);
+  // on for the customer's page, where the van only shows up when it's coming to them and they want to see both
+  readonly fitVehicles = input(false);
   readonly highlighted = input<number | null>(null);
 
   protected readonly failed = signal(false);
@@ -45,6 +48,7 @@ export class RouteMap {
   private markers: { routeId: number | null; marker: Marker; element: HTMLElement }[] = [];
   private popups: Popup[] = [];
   private vans = new Map<number, { marker: Marker; element: HTMLElement }>();
+  private framed: [number, number][] = [];      // stops, depots and paths from the last draw(), for fitCamera()
   private lastFit = '';
 
   constructor() {
@@ -103,7 +107,7 @@ export class RouteMap {
     this.popups.forEach((popup) => popup.remove());
     this.markers = [];
     this.popups = [];
-    const bounds = new maplibre.LngLatBounds();
+    const framed: [number, number][] = [];
 
     const addMarker = (element: HTMLElement, routeId: number | null, lng: number, lat: number, stop?: MapStop) => {
       const marker = new maplibre.Marker({ element }).setLngLat([lng, lat]).addTo(map);
@@ -113,7 +117,7 @@ export class RouteMap {
         this.popups.push(popup);
       }
       this.markers.push({ routeId, marker, element });
-      bounds.extend([lng, lat]);
+      framed.push([lng, lat]);
     };
 
     for (const depot of depots) {
@@ -127,12 +131,25 @@ export class RouteMap {
         addMarker(stopElement(stop, route.fill, route.ink, false), route.id, stop.longitude, stop.latitude, stop);
       }
       // The share page has a road path but no pins to frame
-      for (const point of route.path ?? []) bounds.extend(point);
+      framed.push(...(route.path ?? []));
     }
     // untracked: reading highlighted() here would make the draw effect rebuild every marker on each hover
     this.setLines(routes, untracked(this.highlighted));
 
-    // Only move the camera when the set of points changes, not on every redraw
+    this.framed = framed;
+    this.fitCamera();
+  }
+
+  // One place decides the camera, so draw() and drawVans() can't undo each other's framing.
+  // Only moves when the set of points changes, not on every redraw
+  private fitCamera(): void {
+    const { map, maplibre } = this;
+    if (!map || !maplibre) return;
+    const bounds = new maplibre.LngLatBounds();
+    for (const point of this.framed) bounds.extend(point);
+    if (untracked(this.fitVehicles)) {
+      for (const { marker } of this.vans.values()) bounds.extend(marker.getLngLat());
+    }
     const fitKey = bounds.isEmpty() ? '' : bounds.toArray().flat().join();
     if (fitKey && fitKey !== this.lastFit) {
       this.lastFit = fitKey;
@@ -182,6 +199,7 @@ export class RouteMap {
       }
     }
     this.applyHighlight(untracked(this.highlighted));
+    if (untracked(this.fitVehicles)) this.fitCamera();
   }
 
   private applyHighlight(highlighted: number | null): void {

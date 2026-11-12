@@ -1,0 +1,82 @@
+<header class="top">
+  <a routerLink="/" class="home"><app-brand /></a>
+</header>
+
+<main class="page">
+  @if (data.hasValue()) {
+    @let t = data.value()!;
+    <div>
+      <p class="small muted">Delivery from {{ t.companyName }}</p>
+      <h1>{{ headline() }}</h1>
+    </div>
+
+    @if (lateMessage(); as message) {
+      <p class="banner banner-warn" role="status"><app-icon name="clock" /> {{ message }}</p>
+    }
+
+    <section class="card card-pad status" [class]="'is-' + t.stage">
+      @switch (t.stage) {
+        @case ('delivered') {
+          <app-icon name="check" [size]="28" />
+          <div>
+            <strong>Delivered @if (t.deliveredAt) { at <span class="mono">{{ clock(t.deliveredAt) }}</span> }</strong>
+            <p class="small muted">Thanks for your order.</p>
+          </div>
+        }
+        @case ('failed') {
+          <app-icon name="alert" [size]="28" />
+          <div>
+            <strong>Sorry, this delivery didn't happen.</strong>
+            <p class="small muted">{{ t.companyName }} will contact you to arrange another time.</p>
+          </div>
+        }
+        @case ('arrived') {
+          <app-icon name="pin" [size]="28" />
+          <div>
+            <strong>Your driver has arrived.</strong>
+            <p class="small muted">Please head to the door.</p>
+          </div>
+        }
+        @default {
+          <app-icon [name]="t.stage === 'scheduled' ? 'clock' : 'truck'" [size]="28" />
+          <div>
+            @if (t.etaStart) {
+              <span class="small muted">Estimated arrival</span>
+              <strong class="eta mono">{{ clock(t.etaStart) }} – {{ clock(t.etaEnd) }}</strong>
+            } @else {
+              <strong>We'll show an arrival time once your driver sets off.</strong>
+            }
+            @if (t.stage === 'on_the_way') {
+              <p class="small muted">{{ t.stopsBefore }} {{ t.stopsBefore === 1 ? 'stop' : 'stops' }} before yours.</p>
+            } @else if (t.stage === 'next') {
+              <p class="small muted">Your driver is heading to you now.</p>
+            } @else if (t.windowStart && t.windowEnd) {
+              <p class="small muted">You asked for {{ clock(t.windowStart) }}–{{ clock(t.windowEnd) }}.</p>
+            }
+          </div>
+        }
+      }
+    </section>
+
+    @if (showMap()) {
+      <app-route-map [routes]="mapRoutes()" [looseStops]="mapLoose()" [vehicles]="mapVehicles()" [fitVehicles]="true" />
+    }
+
+    <p class="address"><app-icon name="pin" /> {{ t.address }}</p>
+
+    @if (live()) {
+      <p class="small muted">This page updates by itself. Times are local.</p>
+    }
+  } @else if (notFound()) {
+    <section class="card card-pad gone">
+      <app-icon name="alert" [size]="28" />
+      <h1>We can't find this delivery</h1>
+      <p class="muted">The order may not be scheduled yet, or the link was copied incompletely. Try again later, or ask the shop to send it again.</p>
+    </section>
+  } @else if (data.error()) {
+    <p class="banner banner-error" role="alert"><app-icon name="alert" /> {{ errorText() }}</p>
+    <button type="button" class="btn" (click)="data.reload()">Try again</button>
+  } @else {
+    <p class="muted" role="status">Loading your delivery…</p>
+  }
+</main>

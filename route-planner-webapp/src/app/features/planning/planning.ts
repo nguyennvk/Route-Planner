@@ -7,13 +7,14 @@ import { forkJoin, map } from 'rxjs';
 import { Api, MAX_PAGE_SIZE, fetchAll } from '../../core/api';
 import { CompanyContext } from '../../core/company-context';
 import { errorMessage } from '../../core/errors';
-import { Plan, ProblemDetail } from '../../core/models';
+import { Plan, PositionMessage, ProblemDetail } from '../../core/models';
 import { dateInZone, formatDateTime, formatTime, formatWindow } from '../../core/time';
 import { Confirm } from '../../shared/confirm';
 import { DateNav } from '../../shared/date-nav';
 import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
-import { MapDepot, MapRoute, MapStop, RouteMap } from '../../shared/map/route-map';
+import { Live } from '../../core/live';
+import { MapDepot, MapRoute, MapStop, MapVehicle, RouteMap } from '../../shared/map/route-map';
 import { RouteView, buildPlanView, softCostLabel } from './plan-view';
 
 interface SavedPlan { plan: Plan; solvedAt: string; publishedAt?: string; }
@@ -27,6 +28,7 @@ interface SavedPlan { plan: Plan; solvedAt: string; publishedAt?: string; }
 export class Planning {
   private readonly api = inject(Api);
   protected readonly ctx = inject(CompanyContext);
+  private readonly live = inject(Live);
 
   protected readonly softCost = softCostLabel;
 
@@ -102,7 +104,7 @@ export class Planning {
     const saved = this.saved();
     if (!saved || !this.data.hasValue()) return null;
     const { orders: pending, shifts, vehicles, depots } = this.data.value();
-    const orders = [...pending, ...(this.plannedOrders.value() ?? [])];
+    const orders = [...pending, ...(this.plannedOrders.hasValue() ? this.plannedOrders.value() : [])];
 
     // Wait for the planned orders rather than flash "Order #12" placeholders for a moment
     const known = new Set(orders.map((order) => order.id));
@@ -110,6 +112,31 @@ export class Planning {
     if (missing && this.plannedOrders.isLoading()) return null;
 
     return buildPlanView(saved.plan, { orders, shifts, vehicles, depots }, this.ctx.zone());
+  });
+
+  // Vans on the road. Kept out of view() on purpose: a position arrives every few seconds, and rebuilding
+  // the whole plan (stops, loads, lines) for each one would redraw the map's lines and stops too.
+  // Snapshot: where each van on a route in progress was last seen, loaded once per published plan
+  protected readonly positionSnapshot = rxResource({
+    params: () => (this.published() ? { planId: this.saved()!.plan.planId } : undefined),
+    stream: ({ params: { planId } }) => this.api.planPositions(planId),
+  });
+  // Live: every message since the page subscribed, latest per route (filled by the effect in the constructor)
+  private readonly livePositions = signal<ReadonlyMap<number, PositionMessage>>(new Map());
+
+  // Latest known position per route: the snapshot, overridden by any newer live message
+  protected readonly positions = computed(() => {
+    const latest = new Map<number, { latitude: number; longitude: number; recordedAt: string }>();
+    // hasValue() first: value() throws while the resource is in its error state
+    for (const position of this.positionSnapshot.hasValue() ? this.positionSnapshot.value() : []) {
+      if (position.routeId !== null) latest.set(position.routeId, position);
+    }
+    for (const position of this.livePositions().values()) {
+      const known = latest.get(position.routeId);
+      // Same-format wall-clock strings, so comparing them as text compares the times
+      if (!known || position.recordedAt > known.recordedAt) latest.set(position.routeId, position);
+    }
+    return latest;
   });
   protected readonly solvedAtLabel = computed(() => {
     const saved = this.saved();
@@ -169,6 +196,23 @@ export class Planning {
     }));
   });
 
+  // One van per route that has reported, in its route's color
+  protected readonly mapVehicles = computed((): MapVehicle[] => {
+    const positions = this.positions();
+    return (this.view()?.routes ?? []).flatMap((route) => {
+      const position = positions.get(route.routeId);
+      return position ? [{
+        id: route.shiftId,               // same id as the route in mapRoutes, so highlighting a route dims the other vans
+        fill: route.fill,
+        ink: route.ink,
+        title: route.vehicleName,
+        detail: `Last seen ${position.recordedAt.slice(11, 16)}`,   // already on the company's clock
+        latitude: position.latitude,
+        longitude: position.longitude,
+      }] : [];
+    });
+  });
+
   protected readonly mapDepots = computed((): MapDepot[] => {
     if (!this.data.hasValue()) return [];
     const { depots, vehicles } = this.data.value();
@@ -191,6 +235,19 @@ export class Planning {
       this.highlighted.set(null);
       this.confirmPublish.set(false);
       this.publishError.set(null);
+    });
+
+    // Live positions for a published plan: one STOMP subscription per route. A route that hasn't started
+    // simply gets no messages yet, and this way the van shows up the moment its driver presses Start.
+    // Re-runs when the plan changes (another date, re-publish); onCleanup sends UNSUBSCRIBE for the old ones
+    // first, and also runs when the page is left.
+    effect((onCleanup) => {
+      this.livePositions.set(new Map());
+      const plan = this.published() ? this.saved()!.plan : null;
+      if (!plan) return;
+      const subscriptions = plan.routes.map((route) => this.live.routePositions(route.routeId).subscribe((position) =>
+        this.livePositions.update((current) => new Map(current).set(position.routeId, position))));
+      onCleanup(() => subscriptions.forEach((subscription) => subscription.unsubscribe()));
     });
   }
 

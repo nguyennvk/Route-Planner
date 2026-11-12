@@ -5,6 +5,8 @@ import { DEFAULT_CENTER, MAP_STYLE, MapLibreMap, loadMapLibre } from './maplibre
 export interface MapStop { label: string; title: string; detail: string; latitude: number; longitude: number; }
 export interface MapRoute { id: number; fill: string; ink: string; start: [number, number] | null; stops: MapStop[]; path: [number, number][] | null; }
 export interface MapDepot { name: string; latitude: number; longitude: number; }
+// A van's live position. id matches its route's MapRoute id, so highlighting a route dims the other vans.
+export interface MapVehicle { id: number; fill: string; ink: string; title: string; detail: string; latitude: number; longitude: number; }
 
 type Maplibre = typeof import('maplibre-gl');
 const LINE_SOURCE = 'route-lines';
@@ -27,6 +29,7 @@ export class RouteMap {
   readonly routes = input<MapRoute[]>([]);
   readonly looseStops = input<MapStop[]>([]);
   readonly depots = input<MapDepot[]>([]);
+  readonly vehicles = input<MapVehicle[]>([]);
   readonly highlighted = input<number | null>(null);
 
   protected readonly failed = signal(false);
@@ -41,6 +44,7 @@ export class RouteMap {
   private map: MapLibreMap | null = null;
   private markers: { routeId: number | null; marker: Marker; element: HTMLElement }[] = [];
   private popups: Popup[] = [];
+  private vans = new Map<number, { marker: Marker; element: HTMLElement }>();
   private lastFit = '';
 
   constructor() {
@@ -52,6 +56,13 @@ export class RouteMap {
       const loose = this.looseStops();
       const depots = this.depots();
       if (this.ready()) this.draw(routes, loose, depots);
+    });
+
+    // Vans have their own effect: they move every few seconds, and redrawing every stop and line for that
+    // would flicker. Positions don't move the camera either, so the map doesn't jump while someone reads it.
+    effect(() => {
+      const vehicles = this.vehicles();
+      if (this.ready()) this.drawVans(vehicles);
     });
 
     effect(() => {
@@ -145,22 +156,53 @@ export class RouteMap {
     });
   }
 
+  // Moves existing van markers instead of recreating them, so an open popup stays open as the van moves
+  private drawVans(vehicles: MapVehicle[]): void {
+    const { map, maplibre } = this;
+    if (!map || !maplibre) return;
+    const seen = new Set<number>();
+    for (const vehicle of vehicles) {
+      seen.add(vehicle.id);
+      const existing = this.vans.get(vehicle.id);
+      if (existing) {
+        existing.marker.setLngLat([vehicle.longitude, vehicle.latitude]);
+        existing.marker.getPopup()?.setDOMContent(popupContent(vehicle));
+        existing.element.setAttribute('aria-label', `${vehicle.title}, ${vehicle.detail}`);
+        continue;
+      }
+      const element = vanElement(vehicle);
+      const popup = new maplibre.Popup({ offset: 18, closeButton: false, maxWidth: '260px' }).setDOMContent(popupContent(vehicle));
+      const marker = new maplibre.Marker({ element }).setLngLat([vehicle.longitude, vehicle.latitude]).setPopup(popup).addTo(map);
+      this.vans.set(vehicle.id, { marker, element });
+    }
+    for (const [id, { marker }] of this.vans) {
+      if (!seen.has(id)) {
+        marker.remove();
+        this.vans.delete(id);
+      }
+    }
+    this.applyHighlight(untracked(this.highlighted));
+  }
+
   private applyHighlight(highlighted: number | null): void {
     this.setLines(this.routes(), highlighted);
     for (const { routeId, element } of this.markers) {
       element.style.opacity = highlighted === null || routeId === null || routeId === highlighted ? '1' : '0.25';
     }
+    for (const [id, { element }] of this.vans) {
+      element.style.opacity = highlighted === null || id === highlighted ? '1' : '0.25';
+    }
   }
 }
 
 // Text goes in through textContent: customer names are user data and must never be parsed as HTML
-function popupContent(stop: MapStop): HTMLElement {
+function popupContent(item: { title: string; detail: string }): HTMLElement {
   const root = document.createElement('div');
   root.className = 'map-popup';
   const title = document.createElement('strong');
-  title.textContent = stop.title;
+  title.textContent = item.title;
   const detail = document.createElement('span');
-  detail.textContent = stop.detail;
+  detail.textContent = item.detail;
   root.append(title, detail);
   return root;
 }
@@ -173,6 +215,18 @@ function stopElement(stop: MapStop, fill: string, ink: string, loose: boolean): 
   element.style.cssText = `width:${loose ? 18 : 26}px;height:${loose ? 18 : 26}px;padding:2px 0 0;border-radius:50%;cursor:pointer;`
     + `background:${fill};color:${ink};border:2px solid ${loose ? '#55645e' : '#ffffff'};`
     + `font:700 12px/1 var(--font);box-shadow:0 1px 3px rgb(0 0 0 / 35%);transition:opacity 150ms;`;
+  return element;
+}
+
+// A rounded square with a van glyph, bigger than a stop and drawn above it, so it reads as "the vehicle is here"
+function vanElement(vehicle: MapVehicle): HTMLElement {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.textContent = '🚚';
+  element.setAttribute('aria-label', `${vehicle.title}, ${vehicle.detail}`);
+  element.style.cssText = `width:32px;height:32px;padding:0;border-radius:9px;cursor:pointer;z-index:2;`
+    + `background:${vehicle.fill};color:${vehicle.ink};border:3px solid #ffffff;`
+    + `font:16px/1 var(--font);box-shadow:0 2px 6px rgb(0 0 0 / 40%);transition:opacity 150ms;`;
   return element;
 }
 

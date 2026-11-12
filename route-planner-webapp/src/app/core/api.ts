@@ -4,7 +4,7 @@ import { EMPTY, Observable, expand, map, reduce } from 'rxjs';
 import {
   Address, AddressSuggestion, Company, Customer, CustomerRequest, Depot, Item, ItemRequest, LoginResponse,
   Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest, PlanRoute,
-  RegisterRequest, Shift, ShiftRequest, Vehicle, VehicleRequest, VehicleType,
+  RegisterRequest, Shift, ShiftRequest, Vehicle, VehiclePosition, VehicleRequest, VehicleType,
 } from './models';
 
 const API = '/api/v1';
@@ -71,6 +71,7 @@ export class Api {
   createVehicle(companyId: number, body: VehicleRequest) { return this.http.post<Vehicle>(`${API}/companies/${companyId}/vehicles`, body); }
   updateVehicle(id: number, body: Partial<VehicleRequest> & { active?: boolean }) { return this.http.patch<Vehicle>(`${API}/vehicles/${id}`, body); }
   deactivateVehicle(id: number) { return this.http.delete<void>(`${API}/vehicles/${id}`); }
+  vehiclePosition(vehicleId: number) { return this.http.get<VehiclePosition>(`${API}/vehicles/${vehicleId}/position`); }
 
   // shifts
   shifts(companyId: number, query: { date: string; driverUserId?: number | null; page?: number; size?: number }) {
@@ -106,6 +107,8 @@ export class Api {
   solvePlan(companyId: number, body: PlanRequest) { return this.http.post<Plan>(`${API}/companies/${companyId}/plans`, body); }
   // Owner only. Every route needs a driver, and the plan's orders become 'planned'
   publishPlan(planId: number, body: { notifyDrivers: boolean }) { return this.http.post<Plan>(`${API}/plans/${planId}/publish`, body); }
+  // Owner/dispatcher. Last known position of each van on a route in progress; vans that haven't sent one are left out
+  planPositions(planId: number) { return this.http.get<VehiclePosition[]>(`${API}/plans/${planId}/positions`); }
 
   // drivers: the logged-in user's routes from published plans, across all their companies, earliest first
   myRoutes() { return this.http.get<PlanRoute[]>(`${API}/drivers/me/routes`); }

@@ -11,7 +11,7 @@ import { PlanRoute } from '../../core/models';
 import { formatDay, formatTime, shiftDate, todayIn } from '../../core/time';
 import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
-import { MapDepot, MapRoute, RouteMap } from '../../shared/map/route-map';
+import { MapDepot, MapRoute, MapVehicle, RouteMap } from '../../shared/map/route-map';
 import { RouteActions, actionErrorMessage } from '../../shared/route-actions';
 import { ROUTE_COLORS } from '../planning/plan-view';
 import { DriverRouteView, buildDriverRoutes } from './my-routes-view';
@@ -90,6 +90,27 @@ export class MyRoutes {
   private watchId: number | null = null;
   private watchedRouteId: number | null = null;
 
+  // The phone's own latest GPS fix. The driver doesn't need the websocket for this: it's the same fix
+  // onFix sends to the API, so the van moves on their map without a round trip to the server
+  private readonly myPosition = signal<{ routeId: number; latitude: number; longitude: number; at: string } | null>(null);
+
+  // The van on the driver's map: only on the route being driven, and only once the phone has a fix
+  protected readonly mapVehicles = computed((): MapVehicle[] => {
+    const route = this.selected();
+    const position = this.myPosition();
+    if (!route || !position || position.routeId !== route.routeId) return [];
+    const color = ROUTE_COLORS[0];
+    return [{
+      id: route.routeId,                 // same id as the route in mapRoutes
+      fill: color.fill,
+      ink: color.ink,
+      title: `You (${route.vehicleName})`,
+      detail: `Updated ${this.time(position.at)}`,
+      latitude: position.latitude,
+      longitude: position.longitude,
+    }];
+  });
+
   constructor() {
     // Re-runs whenever routes() changes: after load, after Start or Finish swaps the route in, after a reload
     effect(() => {
@@ -104,6 +125,7 @@ export class MyRoutes {
     if (this.watchId !== null) navigator.geolocation.clearWatch(this.watchId);
     this.watchId = null;
     this.watchedRouteId = routeId;
+    this.myPosition.set(null);                              // a fix from the previous route doesn't belong on this one
     if (routeId === null || !('geolocation' in navigator)) return;
     this.watchId = navigator.geolocation.watchPosition(
       (position) => this.onFix(position, routeId),
@@ -113,6 +135,12 @@ export class MyRoutes {
   }
 
   private onFix(position: GeolocationPosition, routeId: number): void {
+    this.myPosition.set({
+      routeId,
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      at: new Date(position.timestamp).toISOString(),       // an instant, so time() shows it on the company's clock
+    });
     this.api.postDriverPosition(routeId, {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,

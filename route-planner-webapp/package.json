@@ -21,9 +21,12 @@
     "@fontsource-variable/overpass": "^5.3.0",
     "@fontsource-variable/overpass-mono": "^5.3.0",
     "@googlemaps/polyline-codec": "^1.0.28",
+    "@stomp/rx-stomp": "^2.4.0",
+    "@stomp/stompjs": "^7.5.0",
     "lucide": "^1.66.0",
     "maplibre-gl": "^6.16.0",
     "rxjs": "~7.8.0",
+    "stomp": "^0.1.1",
     "tslib": "^2.3.0"
   },
   "devDependencies": {

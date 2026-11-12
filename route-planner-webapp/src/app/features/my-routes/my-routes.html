@@ -68,7 +68,7 @@
                                (accept)="accept(route.routeId)" (reject)="reject(route.routeId, $event)"
                                (start)="start(route.routeId)" (finish)="finish(route.routeId)" />
 
-            <app-route-map [routes]="mapRoutes()" [depots]="mapDepots()" />
+            <app-route-map [routes]="mapRoutes()" [depots]="mapDepots()" [vehicles]="mapVehicles()" />
             @if (route.unplacedCount > 0) {
               <p class="small muted">{{ route.unplacedCount }} {{ route.unplacedCount === 1 ? "stop isn't" : "stops aren't" }} on the map because the address has no pin. Every stop is listed below.</p>
             }

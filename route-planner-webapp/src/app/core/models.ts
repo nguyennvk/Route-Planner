@@ -241,3 +241,21 @@ export interface Plan {
   routes: PlanRoute[];
   unassignedOrderIds: number[];   // only known right after solving; publishing returns an empty list
 }
+
+export interface PositionMessage {
+  routeId: number;
+  latitude: number;
+  longitude: number;
+  speedKmh: number | null;
+  recordedAt: string;      // company wall clock, like the other LocalDateTime fields
+}
+
+export interface VehiclePosition {
+  vehicleId: number;
+  latitude: number;
+  longitude: number;
+  routeId: number | null;    // null once the route it was sent for is deleted
+  speedKmh: number | null;
+  recordedAt: string;
+
+}

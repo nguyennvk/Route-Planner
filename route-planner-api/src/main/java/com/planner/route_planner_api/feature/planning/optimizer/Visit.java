@@ -58,7 +58,10 @@ public class Visit {
             return null;
         }
         if (previousVisit == null) {
-            return vehicle.getDepartureTime().plusSeconds(vehicle.getHomeLocation().getDrivingTimeTo(location));
+            // First stop: the van leaves the depot late enough to get here as the window opens, instead of
+            // leaving at the shift start and waiting outside. PlannedVehicle.getStartTime works back from this
+            LocalDateTime earliest = vehicle.getDepartureTime().plusSeconds(vehicle.getHomeLocation().getDrivingTimeTo(location));
+            return (minStartTime != null && earliest.isBefore(minStartTime)) ? minStartTime : earliest;
         }
         LocalDateTime previousDeparture = previousVisit.getDepartureTime();
         if (previousDeparture == null) {

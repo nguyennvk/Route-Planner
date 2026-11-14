@@ -23,7 +23,7 @@ public class PlannedVehicle {
     private Long vehicleId;
     private int capacity;
     private Location homeLocation;
-    private LocalDateTime departureTime;
+    private LocalDateTime departureTime;    // the shift start: the earliest the van may leave (see getStartTime)
     private LocalDateTime shiftEndTime;
 
     // What the solver decides: which visits this vehicle does, in driving order
@@ -60,6 +60,16 @@ public class PlannedVehicle {
         return new Double[][] { latitudes, longitudes };
     }
 
+    // When the van actually leaves the depot: as late as it can without delaying the first stop, and never
+    // before the shift starts (departureTime is that earliest moment). Visit.arrivalTimeSupplier already places
+    // the first arrival at the window opening, so this works back from it. Null for an empty route
+    public LocalDateTime getStartTime() {
+        if (visits.isEmpty()) return null;
+        Visit first = visits.get(0);
+        if (first.getArrivalTime() == null) return null;
+        return first.getArrivalTime().minusSeconds(homeLocation.getDrivingTimeTo(first.getLocation()));
+    }
+
     public LocalDateTime getReturnTime() {
         if (visits.isEmpty()) return null;
         Visit last = visits.get(visits.size() - 1);
@@ -67,25 +77,29 @@ public class PlannedVehicle {
     }
 
     public Integer getTotalMinutes() {
+        LocalDateTime start = getStartTime();
         LocalDateTime returnTime = getReturnTime();
-        if (returnTime == null) return 0;
-        return (int) Duration.between(departureTime, returnTime).toMinutes();
+        if (start == null || returnTime == null) return 0;
+        return (int) Duration.between(start, returnTime).toMinutes();
     }
 
-    // Paid seconds inside the shift: leaving the depot until back, capped at the shift end.
-    // Waiting for a window counts, because the driver is on the clock. 0 for an empty route
+    // Paid seconds inside the shift: leaving the depot until back, capped at the shift end. Waiting between
+    // stops counts, because the driver is on the clock; time before leaving doesn't. 0 for an empty route
     public long getRegularSeconds() {
+        LocalDateTime start = getStartTime();
         LocalDateTime returnTime = getReturnTime();
-        if (returnTime == null) return 0;
+        if (start == null || returnTime == null) return 0;
         LocalDateTime end = returnTime.isAfter(shiftEndTime) ? shiftEndTime : returnTime;
-        return Duration.between(departureTime, end).toSeconds();
+        return end.isAfter(start) ? Duration.between(start, end).toSeconds() : 0;   // 0 if it only leaves after the shift ends
     }
 
     // Paid seconds after the shift end; 0 when the vehicle is back in time
     public long getOvertimeSeconds() {
+        LocalDateTime start = getStartTime();
         LocalDateTime returnTime = getReturnTime();
-        if (returnTime == null || !returnTime.isAfter(shiftEndTime)) return 0;
-        return Duration.between(shiftEndTime, returnTime).toSeconds();
+        if (start == null || returnTime == null || !returnTime.isAfter(shiftEndTime)) return 0;
+        LocalDateTime from = start.isAfter(shiftEndTime) ? start : shiftEndTime;
+        return Duration.between(from, returnTime).toSeconds();
     }
 
     // Road metres depot → stops → depot; 0 for an empty route. A primitive long so constraints can use it cheaply

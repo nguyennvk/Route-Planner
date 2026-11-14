@@ -15,7 +15,7 @@ const SAMPLE_STOPS = [
 const STEPS = [
   { title: 'Set up your fleet', text: 'Depots, vehicles with their weight limits, and the shifts that put them on the road.' },
   { title: 'Take your orders', text: 'Pick a customer and items. The weight adds itself up, and you set the delivery window.' },
-  { title: 'Choose the day', text: 'Tick the shifts and pending orders you want planned. Leave out whatever can wait.' },
+  { title: 'Choose the day', text: 'Tick the shifts and pending orders you want planned, and adjust your prices and rules if you like. Leave out whatever can wait.' },
   { title: 'Solve', text: 'Get every vehicle a run sheet with stops in order, arrival times and a map.' },
 ];
 

@@ -22,7 +22,9 @@ public record RouteResponse(
     boolean answerOpen,                     // false once the route started or finished, or the plan is completed
     LocalDateTime startedAt,                // when the driver started / finished, on the company's clock; null until then
     LocalDateTime finishedAt,
-    String shareToken                       // the driver's no-login link; only the owner, the driver and the link's holder get routes
+    String shareToken,                      // the driver's no-login link; only the owner, the driver and the link's holder get routes
+    LocalDateTime plannedStart,             // when the solver has the van leave the depot and get back, on the company's clock
+    LocalDateTime plannedEnd
 ) {
     public static RouteResponse toRoute(Route route, List<RouteStop> stops, ZoneId zone) {
         List<StopResponse> stopResponses = stops.stream()
@@ -40,7 +42,9 @@ public record RouteResponse(
             route.isAnswerOpen(),
             ZonedTime.toLocalDateTime(route.getStartedAt(), zone),
             ZonedTime.toLocalDateTime(route.getFinishedAt(), zone),
-            route.getShareToken()
+            route.getShareToken(),
+            ZonedTime.toLocalDateTime(route.getPlannedStart(), zone),
+            ZonedTime.toLocalDateTime(route.getPlannedEnd(), zone)
         );
     }
 

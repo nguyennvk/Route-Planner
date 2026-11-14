@@ -47,6 +47,20 @@ h1 { font-size: clamp(40px, 5.6vw, 82px); font-weight: 800; line-height: 1.02; l
 main h2 { font-size: clamp(30px, 3.6vw, 48px); font-weight: 800; letter-spacing: -0.018em; line-height: 1.06; }
 .section-copy p, .rules-head p { margin-top: 16px; font-size: 18px; line-height: 1.5; color: var(--ink-soft); max-width: 36em; }
 
+/* The hook: an amber warning sign right under the hero, so it reads as "stop and look" next to the green ones */
+.hook {
+  margin-top: 12px;
+  padding: clamp(36px, 6vw, 72px) clamp(24px, 5vw, 72px);
+  border-radius: 22px;
+  background: var(--accent);
+  color: var(--gray-950);
+  box-shadow: inset 0 0 0 6px var(--accent), inset 0 0 0 9px var(--gray-950);
+  text-align: center;
+}
+.hook-eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.hook h2 { margin: 10px auto 0; font-size: clamp(30px, 4.6vw, 60px); line-height: 1.08; max-width: 15em; text-wrap: balance; }
+.hook-text { margin: 18px auto 28px; font-size: 19px; line-height: 1.5; max-width: 36em; text-wrap: pretty; }
+
 /* Run sheet */
 .run-sheet { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: center; gap: clamp(28px, 5vw, 72px); }
 .sheet { margin: 0; }
@@ -112,6 +126,8 @@ figcaption { margin-bottom: 8px; font-size: 13px; color: var(--ink-muted); }
   :host { padding: 6px; }
   .nav nav { display: none; }
   .sign { border-radius: 16px; box-shadow: inset 0 0 0 4px var(--brand), inset 0 0 0 6px var(--white); }
+  .hook { margin-top: 6px; border-radius: 16px; box-shadow: inset 0 0 0 4px var(--accent), inset 0 0 0 6px var(--gray-950); }
+  .hook-text { font-size: 17px; }
   .login { font-size: 14px; white-space: nowrap; }
   .nav { gap: 10px; }
   .nav-actions { gap: 10px; }

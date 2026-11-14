@@ -18,6 +18,9 @@
       </div>
     }
     @if (solveError()) { <div class="banner banner-error msg" role="alert"><app-icon name="alert" /><div>{{ solveError() }}</div></div> }
+    @if (settingsBlocking() && !published()) {
+      <div class="banner banner-warn msg" role="status"><app-icon name="warning" /><div>A price under <strong>Costs and rules</strong> needs fixing before you can solve.</div></div>
+    }
 
     <div class="layout" [class.solved]="view() !== null">
       <aside class="inputs">
@@ -63,6 +66,8 @@
             <p class="total small muted">{{ selectedWeight() | number: '1.0-1' }} kg selected</p>
           }
         </section>
+
+        <app-plan-preferences [settings]="planSettings()" (settingsChange)="changeSettings($event)" [vehicleTypes]="vehicleTypes()" />
       </aside>
 
       <div class="results">
@@ -103,12 +108,13 @@
               <div class="tile"><dt>Orders routed</dt><dd>{{ plan.assignedCount }}<span class="of"> / {{ plan.assignedCount + plan.unassigned.length }}</span></dd></div>
               <div class="tile"><dt>Vehicles used</dt><dd>{{ plan.routes.length }}<span class="of"> / {{ plan.routes.length + plan.idleRoutes.length }}</span></dd></div>
               <div class="tile"><dt>Late stops</dt><dd>{{ plan.lateCount }}</dd></div>
-              @if (plan.score) { <div class="tile"><dt>Cost</dt><dd class="cost">{{ softCost(plan.score.soft) }}</dd></div> }
+              @if (plan.score) { <div class="tile"><dt>Estimated cost</dt><dd class="cost">{{ softCost(plan.score.soft) }}</dd></div> }
             </dl>
 
             <details class="explain small">
               <summary>What does the cost mean?</summary>
-              <p>Total driving time, plus lateness on flexible windows at 5 minutes of driving per minute late. Lower is better.</p>
+              <p>Fuel for the distance driven, driver wages from leaving the depot until getting back, and overtime, using the prices under Costs and rules.
+                It also includes the price you set for minutes late, and for orders skipped because they cost too much. Lower is better.</p>
               <p>Raw solver score: <span class="mono">{{ saved()?.plan?.score }}</span>. The solver improves hard rules first, then how many orders are delivered, then this cost.</p>
             </details>
           </section>
@@ -140,7 +146,8 @@
                     <thead><tr><th>#</th><th>Arrive</th><th>Leave</th><th>Customer</th><th>Window</th><th class="num">Weight</th></tr></thead>
                     <tbody>
                       @if (route.depot) {
-                        <tr class="depot-row"><td></td><td colspan="2"></td><td colspan="3" class="muted">Starts at {{ route.depot.name }}</td></tr>
+                        <tr class="depot-row"><td></td><td></td><td class="mono nowrap">{{ route.leaves ? time(route.leaves) : '' }}</td>
+                          <td colspan="3" class="muted">{{ route.leaves ? 'Leaves' : 'Starts at' }} {{ route.depot.name }}</td></tr>
                       }
                       @for (stop of route.stops; track stop.orderId) {
                         <tr>
@@ -149,11 +156,15 @@
                           <td class="mono nowrap">{{ time(stop.departure) }}</td>
                           <td>{{ stop.customerName }}<span class="cell-sub">{{ stop.address }}</span></td>
                           <td class="nowrap">
-                            {{ orderWindow(stop.windowStart, stop.windowEnd) }}
+                            {{ orderWindow(stop.windowStart, stop.windowEnd) }}@if (stop.windowStrict) {<span class="muted">, strict</span>}
                             @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }
                           </td>
                           <td class="num nowrap">{{ stop.weightKg === null ? '–' : (stop.weightKg | number: '1.0-1') + ' kg' }}</td>
                         </tr>
+                      }
+                      @if (route.depot && route.returns) {
+                        <tr class="depot-row"><td></td><td class="mono nowrap">{{ time(route.returns) }}</td><td></td>
+                          <td colspan="3" class="muted">Back at {{ route.depot.name }}</td></tr>
                       }
                     </tbody>
                   </table>

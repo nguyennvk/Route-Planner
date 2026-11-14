@@ -60,6 +60,8 @@ export interface RouteView {
   capacityKg: number | null;
   loadShare: number | null;
   path: [number, number][] | null;  // road path as [lng, lat], or null to join stops with straight lines
+  leaves: string | null;            // instant the van leaves the depot / gets back; null on older saved plans
+  returns: string | null;
   shareToken: string | null;        // null on plans saved in the browser before the API returned it
 }
 
@@ -129,6 +131,8 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
       capacityKg,
       loadShare: capacityKg ? usedKg / capacityKg : null,
       path: route.geometry ? decodePath(route.geometry) : null,
+      leaves: companyLocalToInstant(route.plannedStart ?? null, zone),
+      returns: companyLocalToInstant(route.plannedEnd ?? null, zone),
     };
   });
 
@@ -157,10 +161,9 @@ export function decodePath(polyline: string): [number, number][] {
   return decode(polyline, 5).map(([lat, lng]): [number, number] => [lng, lat]);
 }
 
-// Soft score is driving seconds plus lateness at 5 minutes of driving per late minute, so it reads as time
+// The soft score is the estimated cost in cents (fuel, wages, overtime, and the owner's price for lateness),
+// as a penalty, so it's negative
 export function softCostLabel(soft: number): string {
-  const totalMinutes = Math.round(Math.abs(soft) / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`;
+  const dollars = Math.abs(soft) / 100;
+  return `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

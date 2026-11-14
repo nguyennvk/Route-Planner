@@ -199,6 +199,28 @@ export interface PlanRequest {
   planDate: string;
   orderIds: number[];
   shiftIds: number[];
+  planPreferences: Record<number, ShiftPrices>;   // keyed by shift id; every shift being solved needs prices
+  planScorePreference?: PlanScorePreference;
+}
+
+// PlanPreference.java: one shift's prices, in cents
+export interface ShiftPrices {
+  fuelCentsPerKm: number;
+  wageCentsPerHour: number;
+  overtimeCentsPerHour: number;
+}
+
+// ScoreProps.java. On SOFT the weight is cents per unit (per order left out, per kg over, per minute late)
+export interface RuleWeight {
+  type: 'HARD' | 'MEDIUM' | 'SOFT';
+  weight: number;
+}
+
+// PlanScorePreference.java: null keeps that rule's default
+export interface PlanScorePreference {
+  capacity: RuleWeight | null;
+  missingOrder: RuleWeight | null;
+  late: RuleWeight | null;
 }
 
 export type PlanStatus = 'draft' | 'solving' | 'published' | 'completed' | 'failed';
@@ -231,6 +253,10 @@ export interface PlanRoute {
   startedAt: string | null;                    // company wall clock, like stop times; null until the driver starts
   finishedAt: string | null;
   shareToken: string;                          // opens /route/{token} without logging in
+  // When the solver has the van leave the depot and get back, company wall clock. The van may leave after
+  // the shift starts, so it doesn't wait outside a window. Missing on plans saved before the API sent it
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
 }
 
 export interface Plan {

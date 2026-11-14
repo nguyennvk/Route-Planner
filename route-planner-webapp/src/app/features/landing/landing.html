@@ -57,6 +57,13 @@
 </div>
 
 <main>
+  <section class="hook" aria-labelledby="hook-title">
+    <p class="hook-eyebrow">Your numbers, not ours</p>
+    <h2 id="hook-title">The shortest route isn't always the cheapest day.</h2>
+    <p class="hook-text">A van waiting outside a shop that isn't open yet still costs you wages. Tell Route Scheduler what an hour, a kilometre and a late delivery really cost you, and it plans the day that costs you least. Busy day, different rules? Change them and solve again.</p>
+    <a [routerLink]="session.loggedIn() ? '/app' : '/register'" class="btn btn-primary btn-large">Try it with your numbers <app-icon name="arrow-right" [size]="18" /></a>
+  </section>
+
   <section id="run-sheet" class="section run-sheet">
     <div class="section-copy">
       <h2>A run sheet for every vehicle</h2>
@@ -102,8 +109,8 @@
 
   <section id="rules" class="section rules">
     <div class="rules-head">
-      <h2>It decides in a fixed order of priority</h2>
-      <p>A shorter route never wins by overloading a van or missing a promise. Each level only counts once the one above it is settled.</p>
+      <h2>It decides in a fixed order, using your prices</h2>
+      <p>A cheaper route never wins by overloading a van or missing a promise. Each level only counts once the one above it is settled.</p>
     </div>
     <div>
     <ol class="priorities">
@@ -111,21 +118,21 @@
         <span class="tier">First</span>
         <div>
           <h3>Keep the hard rules</h3>
-          <p>No vehicle goes over its weight limit. Orders marked as strict arrive inside their delivery window. If a plan ever can't meet these, the screen tells you plainly.</p>
+          <p>No vehicle goes over its weight limit, unless you choose to allow small overloads. Orders marked as strict arrive inside their delivery window. If a plan ever can't meet these, the screen tells you plainly.</p>
         </div>
       </li>
       <li>
         <span class="tier">Then</span>
         <div>
           <h3>Deliver as many orders as possible</h3>
-          <p>Leaving an order behind costs more than any amount of extra driving.</p>
+          <p>By default, leaving an order behind costs more than any amount of extra driving. Or set a limit, and an order that would cost more than that to deliver waits for another day.</p>
         </div>
       </li>
       <li>
         <span class="tier">Finally</span>
         <div>
           <h3>Cut the cost of the day</h3>
-          <p>Less total driving, measured with real road travel times. On a flexible window, a minute late counts the same as five minutes behind the wheel.</p>
+          <p>Fuel for every km, driver wages from the depot and back (waiting included), and overtime, all at your prices and measured with real road travel times. A late arrival on a flexible window costs whatever you say a minute late is worth.</p>
         </div>
       </li>
     </ol>

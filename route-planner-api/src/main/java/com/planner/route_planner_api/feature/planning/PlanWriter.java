@@ -70,7 +70,7 @@ public class PlanWriter {
                 shift.getDriver(),
                 vehicle.getTotalMinutes(),
                 vehicle.getTotalDistance(),
-                ZonedTime.toInstant(vehicle.getDepartureTime(), zone),
+                ZonedTime.toInstant(vehicle.getStartTime(), zone),     // when it really leaves, which may be after the shift starts
                 ZonedTime.toInstant(vehicle.getReturnTime(), zone)
             );
             route.setGeometry(vehicle.getGeometry());        // null when OSRM couldn't route this vehicle

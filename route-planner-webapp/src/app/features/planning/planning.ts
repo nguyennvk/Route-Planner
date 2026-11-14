@@ -15,13 +15,15 @@ import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
 import { Live } from '../../core/live';
 import { MapDepot, MapRoute, MapStop, MapVehicle, RouteMap } from '../../shared/map/route-map';
+import { PlanPreferences } from './plan-preferences';
+import { DEFAULT_PLAN_SETTINGS, PlanSettings, readPlanSettings, settingsValid, toSolveRequest, writePlanSettings } from './plan-settings';
 import { RouteView, buildPlanView, softCostLabel } from './plan-view';
 
 interface SavedPlan { plan: Plan; solvedAt: string; publishedAt?: string; }
 
 @Component({
   selector: 'app-planning',
-  imports: [DecimalPipe, PercentPipe, RouterLink, Confirm, DateNav, Icon, LoadState, RouteMap],
+  imports: [DecimalPipe, PercentPipe, RouterLink, Confirm, DateNav, Icon, LoadState, PlanPreferences, RouteMap],
   templateUrl: './planning.html',
   styleUrl: './planning.css',
 })
@@ -83,6 +85,25 @@ export class Planning {
     this.excludedOrders.set(included ? new Set() : new Set(this.candidates().map((order) => order.id)));
   }
 
+  // Costs and rules for the solver, one saved copy per company (loaded in the constructor's effect)
+  protected readonly planSettings = signal<PlanSettings>(DEFAULT_PLAN_SETTINGS);
+  protected readonly vehicleTypes = computed(() => (this.data.hasValue() ? [...new Set(this.data.value().vehicles.map((v) => v.type))] : []));
+  // Only the fuel prices of the vehicles being solved need to be valid
+  private readonly settingsReady = computed(() => {
+    if (!this.data.hasValue()) return false;
+    const typeById = new Map(this.data.value().vehicles.map((vehicle) => [vehicle.id, vehicle.type]));
+    const types = [...new Set(this.selectedShifts().map((shift) => typeById.get(shift.vehicleId) ?? 'van'))];
+    return settingsValid(this.planSettings(), types);
+  });
+
+  // Says why Solve is disabled when the only reason is a bad price
+  protected readonly settingsBlocking = computed(() => this.data.hasValue() && !this.settingsReady());
+
+  protected changeSettings(settings: PlanSettings): void {
+    this.planSettings.set(settings);
+    writePlanSettings(this.ctx.id(), settings);
+  }
+
   // Solving
   protected readonly solving = signal(false);
   protected readonly elapsed = signal(0);
@@ -98,7 +119,7 @@ export class Planning {
 
   // A published plan stays on screen until the owner starts a new one, so solving can't replace it by accident
   protected readonly canSolve = computed(() =>
-    !this.solving() && !this.published() && this.selectedOrders().length > 0 && this.selectedShifts().length > 0);
+    !this.solving() && !this.published() && this.selectedOrders().length > 0 && this.selectedShifts().length > 0 && this.settingsReady());
 
   protected readonly view = computed(() => {
     const saved = this.saved();
@@ -229,6 +250,7 @@ export class Planning {
     effect(() => {
       const key = this.storageKey();
       this.saved.set(readSaved(key));
+      this.planSettings.set(readPlanSettings(this.ctx.id()));
       this.excludedOrders.set(new Set());
       this.excludedShifts.set(new Set());
       this.solveError.set(null);
@@ -265,10 +287,13 @@ export class Planning {
     };
 
     this.publishError.set(null);
+    const shifts = this.selectedShifts();
     this.api.solvePlan(this.ctx.id(), {
       planDate: this.ctx.date(),
       orderIds: this.selectedOrders().map((order) => order.id),
-      shiftIds: this.selectedShifts().map((shift) => shift.id),
+      shiftIds: shifts.map((shift) => shift.id),
+      // canSolve() already waited for data, so value() is safe here
+      ...toSolveRequest(this.planSettings(), shifts, this.data.value()!.vehicles),
     }).subscribe({
       next: (plan) => {
         stop();

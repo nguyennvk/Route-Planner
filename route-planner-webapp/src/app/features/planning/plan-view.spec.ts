@@ -31,9 +31,10 @@ describe('parseScore', () => {
 });
 
 describe('softCostLabel', () => {
-  it('reads the score as time', () => {
-    expect(softCostLabel(-1037)).toBe('17 min');
-    expect(softCostLabel(-7500)).toBe('2 h 5 min');
+  it('reads the score as dollars from cents', () => {
+    expect(softCostLabel(-16833)).toBe('$168.33');
+    expect(softCostLabel(-123456789)).toBe('$1,234,567.89');
+    expect(softCostLabel(0)).toBe('$0.00');
   });
 });
 

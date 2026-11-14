@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.planner.route_planner_api.common.error.BadRequestException;
 import com.planner.route_planner_api.common.error.ConflictException;
 import com.planner.route_planner_api.common.error.ForbiddenException;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
@@ -35,6 +36,8 @@ import com.planner.route_planner_api.feature.companies.MemberRole;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderRepository;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
+import com.planner.route_planner_api.feature.planning.constraints.PlanPreference;
+import com.planner.route_planner_api.feature.planning.constraints.PlanningWeights;
 import com.planner.route_planner_api.feature.planning.dto.PlanPublishRequest;
 import com.planner.route_planner_api.feature.planning.dto.PlanRequest;
 import com.planner.route_planner_api.feature.planning.dto.PlanResponse;
@@ -76,6 +79,11 @@ public class PlanningService {
     private final VehicleLastPositionRepository vehicleLastPositionRepository;
 
     private static final Logger log = LoggerFactory.getLogger(PlanningService.class);
+
+    // Stand-ins when OSRM can't route between two points: a day of driving and 1,000 km. Big enough that
+    // the solver avoids the leg, small enough that adding a few never overflows a long or LocalDateTime
+    private static final long UNREACHABLE_SECONDS = 24 * 3600;
+    private static final long UNREACHABLE_METERS = 1_000_000;
 
 
     public PlanningService(
@@ -135,6 +143,9 @@ public class PlanningService {
         LocalDateTime[] timeBound = getTimeBound(plannedVehicles);
         List<Visit> visits = getVisits(orders, zone);
 
+        // Before the plan row exists, so a bad request is a 400 and leaves nothing stuck in 'solving'
+        CostSettings costSettings = parseCostSettings(request.planPreferences(), shifts);
+
         // Create the plan and mark as solving; commits right away so others can see it
         User createdBy = companyMember.getUser();
         Plan plan = planWriter.createSolvingPlan(company, request.planDate(), createdBy);
@@ -154,6 +165,8 @@ public class PlanningService {
                 plannedVehicles,
                 visits
             );
+            problem.setCostSettings(costSettings);
+            problem.setConstraintWeightOverrides(PlanningWeights.from(request.planScorePreference()));
 
             SolverJob<VehicleRoutePlan> job = solverManager.solve(UUID.randomUUID(), problem);
             // Use the returned plan: Timefold solves a copy, so `problem` itself stays unsolved
@@ -227,6 +240,28 @@ public class PlanningService {
         return PlanResponse.from(plan, routes, stops, List.of());
     }
 
+    // Every shift needs prices: a missing one would cost $0, and the solver would load everything onto it
+    private static CostSettings parseCostSettings(Map<Long, PlanPreference> planPreferences, List<VehicleShift> shifts) {
+        List<Long> withoutPrices = shifts.stream()
+            .map(VehicleShift::getId)
+            .filter(shiftId -> !planPreferences.containsKey(shiftId))
+            .toList();
+        if (!withoutPrices.isEmpty()) {
+            throw new BadRequestException("Missing prices for shifts " + withoutPrices);
+        }
+
+        Map<Long, Long> fuelCentsPerKm = new HashMap<>();
+        Map<Long, Long> wageCentsPerHour = new HashMap<>();
+        Map<Long, Long> overtimeCentsPerHour = new HashMap<>();
+        for (VehicleShift shift : shifts) {
+            PlanPreference prices = planPreferences.get(shift.getId());
+            fuelCentsPerKm.put(shift.getId(), prices.fuelCentsPerKm());
+            wageCentsPerHour.put(shift.getId(), prices.wageCentsPerHour());
+            overtimeCentsPerHour.put(shift.getId(), prices.overtimeCentsPerHour());
+        }
+        return new CostSettings(fuelCentsPerKm, wageCentsPerHour, overtimeCentsPerHour);
+    }
+
     private void drawMapPolyline(List<PlannedVehicle> vehicles){
         for (PlannedVehicle vehicle : vehicles){
             if (vehicle.getVisits().isEmpty()) continue;
@@ -235,7 +270,6 @@ public class PlanningService {
             } catch (ServiceUnavailableException ex) {
                 log.warn("No road geometry for shift {}", vehicle.getShiftId(), ex);
             }
-            
         }
     }
 
@@ -246,8 +280,8 @@ public class PlanningService {
             for (int j = 0; j < locations.size(); j++){
                 Double seconds = distanceTableResponse.durations()[i][j];
                 Double meters = distanceTableResponse.distances()[i][j];
-                locatioDurationnMap.put(locations.get(j), seconds == null ? Long.MAX_VALUE / 4 : Math.round(seconds));
-                locationDistanceMap.put(locations.get(j), meters == null ? Long.MAX_VALUE / 4 : Math.round(meters));
+                locatioDurationnMap.put(locations.get(j), seconds == null ? UNREACHABLE_SECONDS : Math.round(seconds));
+                locationDistanceMap.put(locations.get(j), meters == null ? UNREACHABLE_METERS : Math.round(meters));
             }
             locations.get(i).setDrivingTimeInSeconds(locatioDurationnMap);
             locations.get(i).setDrivingDistanceMeter(locationDistanceMap);

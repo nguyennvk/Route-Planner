@@ -72,17 +72,41 @@ public class PlannedVehicle {
         return (int) Duration.between(departureTime, returnTime).toMinutes();
     }
 
-    public BigDecimal getTotalDistance() {
-        if (visits.isEmpty()) return null;
-        Visit last = visits.get(visits.size() - 1);
-        Long totalDistance = last.getLocation().getDrivingDistanceTo(homeLocation);
-        Location prevLocation = homeLocation;
-        for (Visit visit : this.visits) {
-            totalDistance += prevLocation.getDrivingDistanceTo(visit.getLocation());
-            prevLocation = visit.getLocation();
-        }
-        return BigDecimal.valueOf(totalDistance).divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP);
-
+    // Paid seconds inside the shift: leaving the depot until back, capped at the shift end.
+    // Waiting for a window counts, because the driver is on the clock. 0 for an empty route
+    public long getRegularSeconds() {
+        LocalDateTime returnTime = getReturnTime();
+        if (returnTime == null) return 0;
+        LocalDateTime end = returnTime.isAfter(shiftEndTime) ? shiftEndTime : returnTime;
+        return Duration.between(departureTime, end).toSeconds();
     }
 
+    // Paid seconds after the shift end; 0 when the vehicle is back in time
+    public long getOvertimeSeconds() {
+        LocalDateTime returnTime = getReturnTime();
+        if (returnTime == null || !returnTime.isAfter(shiftEndTime)) return 0;
+        return Duration.between(shiftEndTime, returnTime).toSeconds();
+    }
+
+    // Road metres depot → stops → depot; 0 for an empty route. A primitive long so constraints can use it cheaply
+    public long getTotalMeters() {
+        if (visits.isEmpty()) return 0;
+        long total = 0;
+        Location previous = homeLocation;
+        for (Visit visit : visits) {
+            total += previous.getDrivingDistanceTo(visit.getLocation());
+            previous = visit.getLocation();
+        }
+        return total + previous.getDrivingDistanceTo(homeLocation);
+    }
+
+    // Kilometres with 2 decimals, for showing and saving; null for an empty route
+    public BigDecimal getTotalDistance() {
+        if (visits.isEmpty()) return null;
+        return BigDecimal.valueOf(getTotalMeters()).divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP);
+    }
+    
+    public Long getTotalWeight() {
+        return visits.stream().mapToLong(Visit::getWeightKg).sum();
+    }
 }

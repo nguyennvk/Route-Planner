@@ -3,9 +3,13 @@ package com.planner.route_planner_api.feature.planning.optimizer;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.planner.route_planner_api.feature.planning.CostSettings;
+
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
 import ai.timefold.solver.core.api.domain.solution.PlanningEntityCollectionProperty;
 import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
+import ai.timefold.solver.core.api.domain.solution.ProblemFactProperty;
 import ai.timefold.solver.core.api.domain.valuerange.ValueRangeProvider;
 import ai.timefold.solver.core.api.score.HardMediumSoftScore;
 import ai.timefold.solver.core.api.solver.SolverStatus;
@@ -36,6 +40,11 @@ public class VehicleRoutePlan {
 
 
     private SolverStatus solverStatus;
+
+    @ProblemFactProperty
+    private CostSettings costSettings;
+
+    private ConstraintWeightOverrides<HardMediumSoftScore> constraintWeightOverrides;
 
     public VehicleRoutePlan(String name, HardMediumSoftScore score, SolverStatus solverStatus) {
         this.name = name;

@@ -225,6 +225,20 @@ export interface PlanScorePreference {
 
 export type PlanStatus = 'draft' | 'solving' | 'published' | 'completed' | 'failed';
 
+// PlanSummaryResponse.java: one line of the plan list. Times on the company's wall clock
+export interface PlanSummary {
+  planId: number;
+  planDate: string;
+  status: PlanStatus;
+  score: string | null;
+  createdByName: string;
+  createdAt: string | null;
+  solvedAt: string | null;
+  publishedAt: string | null;
+  routeCount: number;
+  stopCount: number;
+}
+
 // Times are LocalDateTime on the company's wall clock (ZonedTime.toLocalDateTime in the API), with no offset
 export interface PlanStop {
   stopId: number;

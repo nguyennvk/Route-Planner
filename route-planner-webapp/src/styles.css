@@ -205,5 +205,6 @@ table.data .row-actions { text-align: right; white-space: nowrap; width: 1%; }
 
 /* MapLibre popups are created outside any component, so their styling has to be global */
 .maplibregl-popup-content { font-family: var(--font); font-size: 13px; padding: 10px 12px 8px; border-radius: var(--radius-m); box-shadow: var(--shadow-pop); }
-.map-popup strong { display: block; }
+.map-popup strong { display: block; margin-bottom: 2px; }
 .map-popup span { display: block; color: var(--ink-muted); }
+.map-popup span + span { margin-top: 2px; }

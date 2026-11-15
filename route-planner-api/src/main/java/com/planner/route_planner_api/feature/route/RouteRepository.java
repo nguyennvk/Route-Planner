@@ -6,6 +6,8 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.planner.route_planner_api.feature.planning.Plan;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
@@ -33,4 +35,21 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
 
     @EntityGraph(attributePaths = {"plan", "vehicle"})
     Optional<Route> findFirstByVehicleIdAndIdNotAndStartedAtIsNotNullAndFinishedAtIsNull(Long vehicleId, Long routeId);
+
+    // How many routes and stops each plan has, for the plan list: one grouped query for a whole page
+    // instead of loading every route and stop. A plan with no routes simply has no row
+    @Query("""
+        select r.plan.id as planId, count(distinct r.id) as routes, count(s.id) as stops
+        from Route r left join RouteStop s on s.route = r
+        where r.plan.id in :planIds
+        group by r.plan.id
+        """)
+    List<PlanCounts> countByPlanIds(@Param("planIds") Collection<Long> planIds);
+
+    // Spring Data fills this interface from the query's column aliases
+    interface PlanCounts {
+        Long getPlanId();
+        long getRoutes();
+        long getStops();
+    }
 }

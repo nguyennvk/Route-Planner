@@ -79,3 +79,7 @@
 .need-driver app-icon { margin-top: 2px; color: var(--danger); }
 
 .copy-link { margin-left: auto; }
+
+/* Which of this day's plans is on screen */
+.plan-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.plan-picker select { flex: 1; min-width: 220px; max-width: 460px; }

@@ -2,7 +2,8 @@ import { Component, DestroyRef, ElementRef, afterNextRender, computed, effect, i
 import type { Marker, Popup } from 'maplibre-gl';
 import { DEFAULT_CENTER, MAP_STYLE, MapLibreMap, loadMapLibre } from './maplibre-loader';
 
-export interface MapStop { label: string; title: string; detail: string; latitude: number; longitude: number; }
+// detail is one line of popup text, or several (e.g. address, then arrival)
+export interface MapStop { label: string; title: string; detail: string | string[]; latitude: number; longitude: number; }
 export interface MapRoute { id: number; fill: string; ink: string; start: [number, number] | null; stops: MapStop[]; path: [number, number][] | null; }
 export interface MapDepot { name: string; latitude: number; longitude: number; }
 // A van's live position. id matches its route's MapRoute id, so highlighting a route dims the other vans.
@@ -214,22 +215,29 @@ export class RouteMap {
 }
 
 // Text goes in through textContent: customer names are user data and must never be parsed as HTML
-function popupContent(item: { title: string; detail: string }): HTMLElement {
+function popupContent(item: { title: string; detail: string | string[] }): HTMLElement {
   const root = document.createElement('div');
   root.className = 'map-popup';
   const title = document.createElement('strong');
   title.textContent = item.title;
-  const detail = document.createElement('span');
-  detail.textContent = item.detail;
-  root.append(title, detail);
+  root.append(title);
+  for (const line of lines(item.detail)) {
+    const detail = document.createElement('span');
+    detail.textContent = line;
+    root.append(detail);
+  }
   return root;
+}
+
+function lines(detail: string | string[]): string[] {
+  return (Array.isArray(detail) ? detail : [detail]).filter((line) => line !== '');
 }
 
 function stopElement(stop: MapStop, fill: string, ink: string, loose: boolean): HTMLElement {
   const element = document.createElement('button');
   element.type = 'button';
   element.textContent = stop.label;
-  element.setAttribute('aria-label', `${stop.title}, ${stop.detail}`);
+  element.setAttribute('aria-label', [stop.title, ...lines(stop.detail)].join(', '));
   element.style.cssText = `width:${loose ? 18 : 26}px;height:${loose ? 18 : 26}px;padding:2px 0 0;border-radius:50%;cursor:pointer;`
     + `background:${fill};color:${ink};border:2px solid ${loose ? '#55645e' : '#ffffff'};`
     + `font:700 12px/1 var(--font);box-shadow:0 1px 3px rgb(0 0 0 / 35%);transition:opacity 150ms;`;
@@ -248,9 +256,16 @@ function vanElement(vehicle: MapVehicle): HTMLElement {
   return element;
 }
 
+// A parking sign: white P on a dark square. Kept dark rather than parking-sign blue, so it can't be
+// mistaken for the first route's blue. The P is decoration; the label says what it is
 function depotElement(name: string): HTMLElement {
   const element = document.createElement('div');
   element.title = `Depot: ${name}`;
-  element.style.cssText = 'width:22px;height:22px;border-radius:5px;background:#101c18;border:2px solid #ffffff;box-shadow:0 1px 3px rgb(0 0 0 / 35%);';
+  element.setAttribute('role', 'img');
+  element.setAttribute('aria-label', `Depot: ${name}`);
+  element.textContent = 'P';
+  element.style.cssText = 'width:24px;height:24px;display:flex;align-items:center;justify-content:center;padding-top:2px;'
+    + 'border-radius:5px;background:#101c18;border:2px solid #ffffff;box-shadow:0 1px 3px rgb(0 0 0 / 35%);'
+    + 'color:#ffffff;font:800 14px/1 var(--font);';
   return element;
 }

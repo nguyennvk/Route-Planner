@@ -15,8 +15,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import jakarta.persistence.criteria.Predicate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +32,7 @@ import com.planner.route_planner_api.common.error.ForbiddenException;
 import com.planner.route_planner_api.common.error.ResourceNotFoundException;
 import com.planner.route_planner_api.common.error.ServiceUnavailableException;
 import com.planner.route_planner_api.common.time.ZonedTime;
+import com.planner.route_planner_api.common.web.PageResponse;
 import com.planner.route_planner_api.feature.addresses.Address;
 import com.planner.route_planner_api.feature.addresses.AddressRepository;
 import com.planner.route_planner_api.feature.auth.User;
@@ -41,6 +48,7 @@ import com.planner.route_planner_api.feature.planning.constraints.PlanningWeight
 import com.planner.route_planner_api.feature.planning.dto.PlanPublishRequest;
 import com.planner.route_planner_api.feature.planning.dto.PlanRequest;
 import com.planner.route_planner_api.feature.planning.dto.PlanResponse;
+import com.planner.route_planner_api.feature.planning.dto.PlanSummaryResponse;
 import com.planner.route_planner_api.feature.planning.geo_provider.OsrmAPI;
 import com.planner.route_planner_api.feature.planning.geo_provider.OsrmTableResponse;
 import com.planner.route_planner_api.feature.planning.optimizer.Location;
@@ -212,6 +220,63 @@ public class PlanningService {
         return vehicleLastPositionRepository.findActiveByPlanId(planId).stream()
             .map(position -> VehiclePositionResponse.from(position, zone))
             .toList();
+    }
+
+    // The plan history, newest first. Every filter is optional: one exact day (the Plan page), a range of
+    // days from / to (both inclusive), and a status. Owners and dispatchers only
+    @Transactional(readOnly = true)
+    public PageResponse<PlanSummaryResponse> listPlans(Long userId, Long companyId, LocalDate date, LocalDate from,
+                                                       LocalDate to, PlanStatus status, int page, int size) {
+        CompanyMember member = companyAccess.requireMember(companyId, userId);
+        requirePlanner(member);
+        if (from != null && to != null && to.isBefore(from)) {
+            throw new BadRequestException("The end of the date range must be on or after its start");
+        }
+        ZoneId zone = member.getCompany().zoneId();
+
+        // Build the WHERE clause from only the filters the client sent
+        Specification<Plan> filters = (root, query, cb) -> {
+            List<Predicate> conditions = new ArrayList<>();
+            conditions.add(cb.equal(root.get("company").get("id"), companyId));
+            if (date != null) conditions.add(cb.equal(root.get("planDate"), date));
+            if (from != null) conditions.add(cb.greaterThanOrEqualTo(root.get("planDate"), from));
+            if (to != null) conditions.add(cb.lessThanOrEqualTo(root.get("planDate"), to));
+            if (status != null) conditions.add(cb.equal(root.get("status"), status));
+            return cb.and(conditions.toArray(Predicate[]::new));
+        };
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.desc("planDate"), Sort.Order.desc("id")));
+        Page<Plan> plans = planRepository.findAll(filters, pageRequest);
+
+        Map<Long, RouteRepository.PlanCounts> counts = routeRepository
+            .countByPlanIds(plans.map(Plan::getId).getContent()).stream()
+            .collect(Collectors.toMap(RouteRepository.PlanCounts::getPlanId, Function.identity()));
+
+        return PageResponse.from(plans.map(plan -> {
+            RouteRepository.PlanCounts count = counts.get(plan.getId());   // null: the plan has no routes (failed, or nothing fit)
+            return PlanSummaryResponse.from(plan, zone, count == null ? 0 : count.getRoutes(), count == null ? 0 : count.getStops());
+        }));
+    }
+
+    // One saved plan with its routes and stops. Which orders were left out isn't stored, so unassignedOrderIds is empty
+    @Transactional(readOnly = true)
+    public PlanResponse getPlan(Long userId, Long planId) {
+        Plan plan = planRepository.findById(planId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan", planId));
+        // Not a member of the plan's company -> same 404 as an unknown id, so ids from other companies don't leak
+        CompanyMember member = companyAccess.findActiveMember(plan.getCompany().getId(), userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan", planId));
+        requirePlanner(member);
+
+        List<Route> routes = routeRepository.findByPlan(plan);
+        List<RouteStop> stops = routes.isEmpty() ? List.of() : routeStopRepository.findByRouteIn(routes);
+        return PlanResponse.from(plan, routes, stops, List.of());
+    }
+
+    // Drivers see their own routes on My routes, not whole plans
+    private static void requirePlanner(CompanyMember member) {
+        if (member.getRole() == MemberRole.driver) {
+            throw new ForbiddenException("Only owners and dispatchers can see plans");
+        }
     }
 
     @Transactional

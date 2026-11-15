@@ -18,6 +18,7 @@ const NAV: { heading: string; links: NavLink[] }[] = [
     // Everyone: an owner who also drives a shift gets routes too
     { path: 'my-routes', label: 'My routes', icon: 'navigation' },
     { path: 'plan', label: 'Plan routes', icon: 'route', ownerOnly: true },
+    { path: 'plans', label: 'Plan history', icon: 'history', ownerOnly: true },
   ] },
   { heading: 'Operations', links: [
     { path: 'orders', label: 'Orders', icon: 'package', ownerOnly: true },

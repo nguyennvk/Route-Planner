@@ -21,6 +21,7 @@ export const routes: Routes = [
       { path: 'dashboard', title: 'Dashboard · Route Scheduler', loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard) },
       { path: 'my-routes', title: 'My routes · Route Scheduler', loadComponent: () => import('./features/my-routes/my-routes').then((m) => m.MyRoutes) },
       { path: 'plan', title: 'Plan routes · Route Scheduler', loadComponent: () => import('./features/planning/planning').then((m) => m.Planning) },
+      { path: 'plans', title: 'Plan history · Route Scheduler', loadComponent: () => import('./features/plans/plan-history').then((m) => m.PlanHistory) },
       { path: 'orders', title: 'Orders · Route Scheduler', loadComponent: () => import('./features/orders/orders').then((m) => m.Orders) },
       { path: 'shifts', title: 'Shifts · Route Scheduler', loadComponent: () => import('./features/shifts/shifts').then((m) => m.Shifts) },
       { path: 'fleet', title: 'Fleet · Route Scheduler', loadComponent: () => import('./features/fleet/fleet').then((m) => m.Fleet) },

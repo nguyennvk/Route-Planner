@@ -4,7 +4,7 @@
     <div class="page-actions">
       <app-date-nav />
       <button type="button" class="btn btn-primary solve" [disabled]="!canSolve()" (click)="solve()">
-        <app-icon name="route" /> {{ solving() ? 'Solving…' : (saved() && !published() ? 'Solve again' : 'Solve routes') }}
+        <app-icon name="route" /> {{ solving() ? 'Solving…' : (saved() && !sent() ? 'Solve again' : 'Solve routes') }}
       </button>
     </div>
   </div>
@@ -18,7 +18,7 @@
       </div>
     }
     @if (solveError()) { <div class="banner banner-error msg" role="alert"><app-icon name="alert" /><div>{{ solveError() }}</div></div> }
-    @if (settingsBlocking() && !published()) {
+    @if (settingsBlocking() && !sent()) {
       <div class="banner banner-warn msg" role="status"><app-icon name="warning" /><div>A price under <strong>Costs and rules</strong> needs fixing before you can solve.</div></div>
     }
 
@@ -83,18 +83,33 @@
       </aside>
 
       <div class="results">
+        @if (choosablePlans().length > 0) {
+          <div class="plan-picker">
+            <label class="field-label" for="plan-pick">Plans for this day</label>
+            <select id="plan-pick" class="input" [disabled]="solving()" (change)="pickPlan($any($event.target).value)">
+              @for (plan of choosablePlans(); track plan.planId) {
+                <option [value]="plan.planId" [selected]="plan.planId === selectedPlanId()">{{ planOptionLabel(plan) }}</option>
+              }
+              <option value="new" [selected]="selectedPlanId() === null">New plan</option>
+            </select>
+            <a class="small" [routerLink]="ctx.link('plans')">All plans</a>
+          </div>
+        }
+        @if (loadedPlan.error()) {
+          <div class="banner banner-error" role="alert"><app-icon name="alert" /><div>This plan couldn't be loaded. Pick it again, or choose another plan.</div></div>
+        }
         <app-route-map [routes]="mapRoutes()" [looseStops]="mapLoose()" [depots]="mapDepots()" [vehicles]="mapVehicles()" [highlighted]="highlighted()" />
 
         @if (view(); as plan) {
-          @if (changedSinceSolve() && !published()) {
+          @if (changedSinceSolve() && !sent()) {
             <div class="banner banner-info" role="status"><app-icon name="info" />
               <div>You changed shifts or orders after this plan was solved. <strong>Solve again</strong> to include the changes.</div></div>
           }
           <p class="map-note small muted">Lines follow the roads in visiting order. A straight line means no road route was available for that vehicle. Square markers are depots.</p>
 
-          <section class="card publish" [class.is-published]="published()" aria-label="Who can see this plan">
-            @if (published()) {
-              <span class="badge badge-ok">Published</span>
+          <section class="card publish" [class.is-published]="sent()" aria-label="Who can see this plan">
+            @if (sent()) {
+              <span class="badge badge-ok">{{ published() ? 'Published' : 'Completed' }}</span>
               <p class="publish-text"><strong>Sent to drivers {{ publishedAtLabel() }}.</strong> Each driver sees their route on My routes, and the orders on it are now planned.</p>
             } @else {
               <span class="badge badge-warn">Draft</span>
@@ -144,7 +159,7 @@
                     <h3>{{ route.vehicleName }}</h3>
                     <span class="small muted">{{ route.driverName || 'No driver yet' }}, {{ route.stops.length }} {{ route.stops.length === 1 ? 'stop' : 'stops' }}</span>
                   </div>
-                  @if (published() && route.shareToken) {
+                  @if (sent() && route.shareToken) {
                     <button type="button" class="btn btn-small copy-link" (click)="copyDriverLink(route)"
                             [attr.aria-label]="'Copy the no-login link for ' + route.vehicleName">
                       <app-icon [name]="copied() === route.routeId ? 'check' : 'link'" /> {{ copied() === route.routeId ? 'Link copied' : 'Copy driver link' }}
@@ -209,12 +224,12 @@
 
           <div class="plan-foot small muted">
             <app-icon name="info" />
-            @if (published()) {
-              <span>To plan more orders for this day, start a new plan. The published routes stay with their drivers.</span>
-              <button type="button" class="link-btn" (click)="discardPlan()">Start a new plan</button>
+            @if (sent()) {
+              <span>To plan more orders for this day, start a new plan. The routes already sent stay with their drivers, and this plan stays under Plans for this day.</span>
+              <button type="button" class="link-btn" (click)="newPlan()">Start a new plan</button>
             } @else {
-              <span>Solved {{ solvedAtLabel() }} and saved as a draft. Only this browser can show it again, because the API can't send a plan back yet.</span>
-              <button type="button" class="link-btn" (click)="discardPlan()">Discard</button>
+              <span>Solved {{ solvedAtLabel() }} and saved as a draft. It stays under Plans for this day, and in the plan history, if you start another.</span>
+              <button type="button" class="link-btn" (click)="newPlan()">Start a new plan</button>
             }
           </div>
         } @else if (!solving()) {

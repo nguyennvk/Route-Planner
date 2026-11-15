@@ -84,7 +84,7 @@ public record PlanResponse(
         return (seconds + 59) / 60;
     }
 
-    private static String scoreOf(Plan plan) {
+    static String scoreOf(Plan plan) {     // package-private: PlanSummaryResponse shows the same score
         if (plan.getHardScore() == null) {
             return null;
         }

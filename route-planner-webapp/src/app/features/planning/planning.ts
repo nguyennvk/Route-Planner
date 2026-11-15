@@ -2,13 +2,13 @@ import { DecimalPipe, PercentPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { forkJoin, map } from 'rxjs';
 import { Api, MAX_PAGE_SIZE, fetchAll } from '../../core/api';
 import { CompanyContext } from '../../core/company-context';
 import { errorMessage } from '../../core/errors';
-import { Order, Plan, PositionMessage, ProblemDetail, Shift } from '../../core/models';
-import { dateInZone, formatDateTime, formatTime, formatWindow } from '../../core/time';
+import { Order, Plan, PlanSummary, PositionMessage, ProblemDetail, Shift } from '../../core/models';
+import { companyLocalToInstant, dateInZone, formatDateTime, formatTime, formatWindow } from '../../core/time';
 import { Confirm } from '../../shared/confirm';
 import { DateNav } from '../../shared/date-nav';
 import { Icon } from '../../shared/icon';
@@ -21,7 +21,8 @@ import { PlanPreferences } from './plan-preferences';
 import { DEFAULT_PLAN_SETTINGS, PlanSettings, readPlanSettings, settingsValid, toSolveRequest, writePlanSettings } from './plan-settings';
 import { RouteView, buildPlanView, softCostLabel } from './plan-view';
 
-interface SavedPlan { plan: Plan; solvedAt: string; publishedAt?: string; }
+// The plan on screen. solvedAt / publishedAt are instants, null until the plan list has them
+interface SavedPlan { plan: Plan; solvedAt: string | null; publishedAt: string | null; }
 
 @Component({
   selector: 'app-planning',
@@ -53,9 +54,10 @@ export class Planning {
   // Publishing turns the plan's orders from pending to planned, so after a reload they're no longer in the
   // list above. This loads them back for names and pins. params returning undefined keeps the resource idle.
   protected readonly plannedOrders = rxResource({
-    params: () => (this.saved()?.plan.status === 'published' ? { id: this.ctx.id() } : undefined),
-    // Once a driver starts a route its orders move from planned to out_for_delivery, so fetch both
-    stream: ({ params: { id } }) => forkJoin((['planned', 'out_for_delivery'] as const).map((status) =>
+    params: () => (this.saved() && this.saved()!.plan.status !== 'draft' ? { id: this.ctx.id() } : undefined),
+    // Drivers move orders on to out_for_delivery, then delivered or failed; an old plan from the history
+    // can have orders in any of these
+    stream: ({ params: { id } }) => forkJoin((['planned', 'out_for_delivery', 'delivered', 'failed'] as const).map((status) =>
       fetchAll((page) => this.api.orders(id, { status, page, size: MAX_PAGE_SIZE })))).pipe(map((lists) => lists.flat())),
   });
 
@@ -133,18 +135,57 @@ export class Planning {
   protected readonly solving = signal(false);
   protected readonly elapsed = signal(0);
   protected readonly solveError = signal<string | null>(null);
-  protected readonly saved = signal<SavedPlan | null>(null);
   protected readonly highlighted = signal<number | null>(null);
   private timer: ReturnType<typeof setInterval> | undefined;
 
-  // The API saves each solved plan, but has no endpoint to read one back, so this browser keeps the copy it shows
-  private readonly storageKey = computed(() => `route-scheduler.plan.${this.ctx.id()}.${this.ctx.date()}`);
+  // Every plan made for this day (a published one, drafts solved after it...), newest first
+  protected readonly dayPlans = rxResource({
+    params: () => ({ id: this.ctx.id(), date: this.ctx.date() }),
+    stream: ({ params: { id, date } }) => this.api.plans(id, { date, size: 50 }).pipe(map((page) => page.content)),
+  });
+  // Only plans with something to show: not a failed solve, one still solving, or one where nothing fit
+  protected readonly choosablePlans = computed(() =>
+    (this.dayPlans.hasValue() ? this.dayPlans.value() : []).filter((plan) => plan.routeCount > 0 && plan.status !== 'failed' && plan.status !== 'solving'));
+
+  // Which plan is on screen. undefined: the newest; 'new': none, to solve a fresh one; a number: that plan
+  private readonly selection = signal<number | 'new' | undefined>(undefined);
+  protected readonly selectedPlanId = computed(() => {
+    const selection = this.selection();
+    if (selection === 'new') return null;
+    return typeof selection === 'number' ? selection : this.choosablePlans()[0]?.planId ?? null;
+  });
+  // A plan from the history page arrives as ?plan=12; applied once, when the page first loads its day
+  private pendingPlanId: number | null = Number(inject(ActivatedRoute).snapshot.queryParamMap.get('plan')) || null;
+
+  // Plans this visit solved or published. Only those responses know which orders were left out
+  // (the API doesn't store that), so they're kept instead of loading the plan again
+  private readonly freshPlans = signal<ReadonlyMap<number, Plan>>(new Map());
+  protected readonly loadedPlan = rxResource({
+    params: () => {
+      const planId = this.selectedPlanId();
+      return planId !== null && !this.freshPlans().has(planId) ? { planId } : undefined;
+    },
+    stream: ({ params: { planId } }) => this.api.plan(planId),
+  });
+
+  protected readonly saved = computed((): SavedPlan | null => {
+    const planId = this.selectedPlanId();
+    if (planId === null) return null;
+    const loaded = this.loadedPlan.hasValue() ? this.loadedPlan.value() : undefined;
+    const plan = this.freshPlans().get(planId) ?? (loaded?.planId === planId ? loaded : null);
+    if (!plan) return null;
+    const summary = this.dayPlans.hasValue() ? this.dayPlans.value().find((entry) => entry.planId === planId) : undefined;
+    const zone = this.ctx.zone();
+    return { plan, solvedAt: companyLocalToInstant(summary?.solvedAt ?? null, zone), publishedAt: companyLocalToInstant(summary?.publishedAt ?? null, zone) };
+  });
 
   protected readonly published = computed(() => this.saved()?.plan.status === 'published');
+  // Published or completed: either way it's gone out, so it can't be solved over
+  protected readonly sent = computed(() => !!this.saved() && this.saved()!.plan.status !== 'draft');
 
-  // A published plan stays on screen until the owner starts a new one, so solving can't replace it by accident
+  // A sent plan stays on screen until the owner starts a new one, so solving can't replace it by accident
   protected readonly canSolve = computed(() =>
-    !this.solving() && !this.published() && this.selectedOrders().length > 0 && this.selectedShifts().length > 0 && this.settingsReady());
+    !this.solving() && !this.sent() && this.selectedOrders().length > 0 && this.selectedShifts().length > 0 && this.settingsReady());
 
   protected readonly view = computed(() => {
     const saved = this.saved();
@@ -184,10 +225,7 @@ export class Planning {
     }
     return latest;
   });
-  protected readonly solvedAtLabel = computed(() => {
-    const saved = this.saved();
-    return saved ? formatDateTime(saved.solvedAt, this.ctx.zone()) : '';
-  });
+  protected readonly solvedAtLabel = computed(() => formatDateTime(this.saved()?.solvedAt, this.ctx.zone()));
   protected readonly publishedAtLabel = computed(() => formatDateTime(this.saved()?.publishedAt, this.ctx.zone()));
 
   // Publishing: the API refuses while any route lacks a driver, so say which ones before the owner tries
@@ -221,7 +259,12 @@ export class Planning {
     stops: route.stops.filter((stop) => stop.latitude !== null).map((stop) => ({
       label: String(stop.sequence + 1),
       title: stop.customerName,
-      detail: `${formatTime(stop.arrival, this.ctx.zone())}, ${route.vehicleName}`,
+      // The vehicle is already clear from the pin's color and number
+      detail: [
+        stop.address,
+        `Estimated arrival ${formatTime(stop.arrival, this.ctx.zone())}`,
+        `Window ${formatWindow(stop.windowStart, stop.windowEnd, this.ctx.zone())}${stop.windowStrict ? ', strict' : ''}`,
+      ],
       latitude: stop.latitude!,
       longitude: stop.longitude!,
     })),
@@ -236,7 +279,10 @@ export class Planning {
     return orders.map((order) => ({
       label: '',
       title: order.customer.name,
-      detail: view ? 'Not on a route' : formatWindow(order.windowStart, order.windowEnd, this.ctx.zone()),
+      detail: [
+        order.address.normalizedAddress || order.address.rawAddress,
+        view ? 'Not on a route' : `Window ${formatWindow(order.windowStart, order.windowEnd, this.ctx.zone())}${order.windowStrict ? ', strict' : ''}`,
+      ],
       latitude: order.address.latitude,
       longitude: order.address.longitude,
     }));
@@ -271,10 +317,12 @@ export class Planning {
   constructor() {
     inject(DestroyRef).onDestroy(() => clearInterval(this.timer));
 
-    // Each company and date has its own saved plan and its own selection
+    // Each company and date has its own plans and its own selection
     effect(() => {
-      const key = this.storageKey();
-      this.saved.set(readSaved(key));
+      this.ctx.id();
+      this.ctx.date();
+      this.selection.set(this.pendingPlanId ?? undefined);
+      this.pendingPlanId = null;
       this.changedSinceSolve.set(false);
       this.planSettings.set(readPlanSettings(this.ctx.id()));
       this.excludedOrders.set(new Set());
@@ -301,7 +349,6 @@ export class Planning {
 
   protected solve(): void {
     if (!this.canSolve()) return;
-    const key = this.storageKey();
     this.solving.set(true);
     this.solveError.set(null);
     this.elapsed.set(0);
@@ -323,10 +370,10 @@ export class Planning {
     }).subscribe({
       next: (plan) => {
         stop();
-        const saved: SavedPlan = { plan, solvedAt: new Date().toISOString() };
-        this.saved.set(saved);
+        this.keepFresh(plan);
+        this.selection.set(plan.planId);
         this.changedSinceSolve.set(false);
-        localStorage.setItem(key, JSON.stringify(saved));
+        this.dayPlans.reload();     // the new draft joins this day's plans
       },
       error: (error: unknown) => {
         stop();
@@ -360,7 +407,6 @@ export class Planning {
   protected publish(): void {
     const saved = this.saved();
     if (!saved || this.publishing()) return;
-    const key = this.storageKey();
     this.publishing.set(true);
     this.publishError.set(null);
     // The API accepts notifyDrivers but doesn't act on it yet (no notification channel); drivers check My routes
@@ -369,9 +415,8 @@ export class Planning {
         this.publishing.set(false);
         this.confirmPublish.set(false);
         // The publish response leaves unassignedOrderIds empty, so keep the list from solving
-        const next: SavedPlan = { ...saved, plan: { ...plan, unassignedOrderIds: saved.plan.unassignedOrderIds }, publishedAt: new Date().toISOString() };
-        this.saved.set(next);
-        localStorage.setItem(key, JSON.stringify(next));
+        this.keepFresh({ ...plan, unassignedOrderIds: saved.plan.unassignedOrderIds });
+        this.dayPlans.reload();     // for the new status and publish time
       },
       error: (error: unknown) => {
         this.publishing.set(false);
@@ -380,11 +425,32 @@ export class Planning {
     });
   }
 
-  protected discardPlan(): void {
-    localStorage.removeItem(this.storageKey());
-    this.saved.set(null);
+  // Clears the screen to solve another plan. The one shown stays saved, in this day's plans and the history
+  protected newPlan(): void {
+    this.selection.set('new');
     this.changedSinceSolve.set(false);
     this.highlighted.set(null);
+  }
+
+  protected pickPlan(value: string): void {
+    if (value === 'new') {
+      this.newPlan();
+      return;
+    }
+    this.selection.set(Number(value));
+    this.changedSinceSolve.set(false);
+    this.highlighted.set(null);
+  }
+
+  // "#12 · Published · 2 routes, 9 stops · 09:14"
+  protected planOptionLabel(plan: PlanSummary): string {
+    const status = { draft: 'Draft', published: 'Published', completed: 'Completed', solving: 'Solving', failed: 'Failed' }[plan.status];
+    const at = formatTime(companyLocalToInstant(plan.publishedAt ?? plan.solvedAt, this.ctx.zone()), this.ctx.zone());
+    return `#${plan.planId} · ${status} · ${plan.routeCount} ${plan.routeCount === 1 ? 'route' : 'routes'}, ${plan.stopCount} ${plan.stopCount === 1 ? 'stop' : 'stops'} · ${at}`;
+  }
+
+  private keepFresh(plan: Plan): void {
+    this.freshPlans.update((current) => new Map(current).set(plan.planId, plan));
   }
 
   // Template helpers
@@ -392,17 +458,6 @@ export class Planning {
   protected orderWindow(start: string | null, end: string | null): string { return formatWindow(start, end, this.ctx.zone()); }
   protected overloaded(route: RouteView): boolean { return (route.loadShare ?? 0) > 1; }
   protected meterWidth(route: RouteView): string { return `${Math.min(route.loadShare ?? 0, 1) * 100}%`; }
-}
-
-// A copy saved before the API stored plans has no planId, so it can't be published, and its times were
-// written in the server's zone rather than the company's. Dropping it is safer than showing wrong times.
-function readSaved(key: string): SavedPlan | null {
-  try {
-    const saved = JSON.parse(localStorage.getItem(key) ?? 'null') as SavedPlan | null;
-    return saved?.plan?.planId ? saved : null;
-  } catch {
-    return null;
-  }
 }
 
 function publishErrorMessage(error: unknown): string {

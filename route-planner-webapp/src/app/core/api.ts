@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { EMPTY, Observable, expand, map, reduce } from 'rxjs';
 import {
   Address, AddressSuggestion, Company, Customer, CustomerRequest, Depot, Item, ItemRequest, LoginResponse,
-  Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest, PlanRoute,
+  Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest, PlanRoute, PlanStatus, PlanSummary,
   RegisterRequest, Shift, ShiftRequest, Tracking, Vehicle, VehiclePosition, VehicleRequest, VehicleType,
 } from './models';
 
@@ -105,6 +105,13 @@ export class Api {
 
   // planning: blocks until the solver stops (5 s without improvement, 30 s at most)
   solvePlan(companyId: number, body: PlanRequest) { return this.http.post<Plan>(`${API}/companies/${companyId}/plans`, body); }
+  // Owner/dispatcher. Every plan the company made, newest first; with a date, only that day's
+  // date: one day; from / to: a range of days, both inclusive
+  plans(companyId: number, query: { date?: string | null; from?: string | null; to?: string | null; status?: PlanStatus | null; page?: number; size?: number } = {}) {
+    return this.http.get<PageResponse<PlanSummary>>(`${API}/companies/${companyId}/plans`, { params: params(query) });
+  }
+  // One saved plan with its routes; unassignedOrderIds is always empty (only the solve response knows it)
+  plan(planId: number) { return this.http.get<Plan>(`${API}/plans/${planId}`); }
   // Owner only. Every route needs a driver, and the plan's orders become 'planned'
   publishPlan(planId: number, body: { notifyDrivers: boolean }) { return this.http.post<Plan>(`${API}/plans/${planId}/publish`, body); }
   // Owner/dispatcher. Last known position of each van on a route in progress; vans that haven't sent one are left out

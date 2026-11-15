@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { EMPTY, Observable, expand, map, reduce } from 'rxjs';
 import {
   Address, AddressSuggestion, Company, Customer, CustomerRequest, Depot, Item, ItemRequest, LoginResponse,
-  Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest, PlanRoute, PlanStatus, PlanSummary,
+  FeedbackRequest, Me, Member, MemberRole, NewAddress, Order, OrderRequest, OrderStatus, PageResponse, Plan, PlanRequest, PlanRoute, PlanStatus, PlanSummary,
   RegisterRequest, Shift, ShiftRequest, Tracking, Vehicle, VehiclePosition, VehicleRequest, VehicleType,
 } from './models';
 
@@ -94,6 +94,9 @@ export class Api {
   }
   createItem(companyId: number, body: ItemRequest) { return this.http.post<Item>(`${API}/companies/${companyId}/items`, body); }
   updateItem(id: number, body: ItemRequest) { return this.http.patch<Item>(`${API}/items/${id}`, body); }
+
+  // Public: the landing page's feedback form, no login needed
+  sendFeedback(body: FeedbackRequest) { return this.http.post<void>(`${API}/feedback`, body); }
 
   // orders
   orders(companyId: number, query: { date?: string | null; status?: OrderStatus | null; customerId?: number | null; page?: number; size?: number } = {}) {

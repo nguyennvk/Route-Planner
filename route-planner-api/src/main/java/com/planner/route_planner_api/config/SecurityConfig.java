@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers("/ws").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/shared/**").permitAll()   // share links: the token is the permission
                 .requestMatchers(HttpMethod.GET, "/api/v1/track/*").permitAll()     // customer's tracking link: same idea, read-only
+                .requestMatchers(HttpMethod.POST, "/api/v1/feedback").permitAll()   // the landing page's feedback form; FeedbackService limits it
                 // Only the driver's actions on their route; any other POST under /shared still needs a login
                 .requestMatchers(HttpMethod.POST,
                     "/api/v1/shared/routes/*/accept",

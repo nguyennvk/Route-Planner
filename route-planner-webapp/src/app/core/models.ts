@@ -329,3 +329,15 @@ export interface Tracking {
   geometry: string | null;               // van → customer road path, only when next
   deliveredAt: string | null;
 }
+
+// FeedbackRequest.java. priceBand: what they'd pay per month; website is a honeypot the form keeps empty
+export type PriceBand = 'nothing' | 'under_10' | 'from_10_to_20' | 'from_20_to_50' | 'from_50_to_100' | 'not_sure';
+
+export interface FeedbackRequest {
+  name: string | null;
+  email: string | null;
+  message: string;
+  priceBand: PriceBand;
+  priceAmount: number | null;
+  website: string;
+}

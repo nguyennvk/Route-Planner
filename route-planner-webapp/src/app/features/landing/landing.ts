@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { Session } from '../../core/session';
 import { Brand } from '../../shared/brand';
 import { Icon, IconName } from '../../shared/icon';
+import { FeedbackForm } from './feedback-form';
 
 // Clearly labelled sample data for the run sheet preview. Not real customers.
 const SAMPLE_STOPS = [
@@ -28,7 +29,7 @@ const DETAILS: { icon: IconName; title: string; text: string }[] = [
 
 @Component({
   selector: 'app-landing',
-  imports: [RouterLink, Brand, Icon],
+  imports: [RouterLink, Brand, FeedbackForm, Icon],
   templateUrl: './landing.html',
   styleUrl: './landing.css',
 })

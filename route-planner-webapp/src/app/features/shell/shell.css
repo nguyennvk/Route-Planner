@@ -53,3 +53,7 @@ main { min-width: 0; }
   .menu-open .sidebar { transform: none; visibility: visible; }
   .menu-open .scrim { display: block; position: fixed; inset: 0; z-index: 30; background: rgb(3 30 22 / 55%); }
 }
+
+/* Opens the landing page's feedback form */
+.feedback-link { display: flex; align-items: center; gap: 8px; margin: 0 10px 6px; padding: 8px 10px; border-radius: var(--radius-m); color: rgb(255 255 255 / 85%); font-size: 14px; text-decoration: none; }
+.feedback-link:hover { background: rgb(255 255 255 / 12%); color: var(--white); }

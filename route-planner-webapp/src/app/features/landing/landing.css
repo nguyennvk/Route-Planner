@@ -149,3 +149,9 @@ figcaption { margin-bottom: 8px; font-size: 13px; color: var(--ink-muted); }
 @media (max-width: 350px) {
   .nav .btn { display: none; }
 }
+
+/* Feedback: what people need and what they'd pay */
+.feedback { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(28px, 5vw, 72px); border-top: 1px solid var(--line-strong); }
+.feedback-head p { margin-top: 16px; font-size: 18px; line-height: 1.5; color: var(--ink-soft); max-width: 30em; }
+.feedback-card { padding: clamp(18px, 3vw, 28px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); }
+@media (max-width: 1040px) { .feedback { grid-template-columns: minmax(0, 1fr); } }

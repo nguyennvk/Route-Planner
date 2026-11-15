@@ -5,6 +5,7 @@
       <a routerLink="/" fragment="run-sheet">Run sheets</a>
       <a routerLink="/" fragment="how">How it works</a>
       <a routerLink="/" fragment="rules">How it decides</a>
+      <a routerLink="/" fragment="feedback">Feedback</a>
     </nav>
     <div class="nav-actions">
       @if (session.loggedIn()) {
@@ -148,6 +149,16 @@
         <p>{{ detail.text }}</p>
       </div>
     }
+  </section>
+
+  <section id="feedback" class="section feedback" aria-labelledby="feedback-title">
+    <div class="feedback-head">
+      <h2 id="feedback-title">Tell us what you'd need</h2>
+      <p>Route Scheduler is still taking shape, and what you tell us decides what gets built next, and what it should cost. It takes two minutes, and you don't need an account.</p>
+    </div>
+    <div class="feedback-card">
+      <app-feedback-form />
+    </div>
   </section>
 
   <section class="sign closing">

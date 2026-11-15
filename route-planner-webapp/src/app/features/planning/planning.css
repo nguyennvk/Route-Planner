@@ -19,7 +19,15 @@
 
 .pick-list li { border-top: 1px solid var(--line); }
 .pick { display: flex; width: 100%; padding: 9px 14px 7px; }
-.pick:hover { background: var(--gray-50); }
+/* A row is the checkbox label plus an edit button beside it: a button can't sit inside a <label> */
+.pick-row { display: flex; align-items: center; }
+.pick-row .pick { flex: 1; min-width: 0; width: auto; }
+.pick-row .edit { flex: none; margin-right: 6px; color: var(--ink-muted); }
+.pick-row .edit:hover:not(:disabled) { color: var(--ink); }
+.pick-row:hover { background: var(--gray-50); }
+.head-actions { display: flex; align-items: center; gap: 14px; }
+.add { display: inline-flex; align-items: center; gap: 3px; }
+.add:disabled { color: var(--ink-muted); cursor: default; }
 .pick-main { flex: 1; min-width: 0; }
 .pick-main strong, .pick-main .small { display: block; }
 .pick-main strong { font-weight: 600; }

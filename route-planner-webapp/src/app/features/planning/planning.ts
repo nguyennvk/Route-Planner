@@ -7,7 +7,7 @@ import { forkJoin, map } from 'rxjs';
 import { Api, MAX_PAGE_SIZE, fetchAll } from '../../core/api';
 import { CompanyContext } from '../../core/company-context';
 import { errorMessage } from '../../core/errors';
-import { Plan, PositionMessage, ProblemDetail } from '../../core/models';
+import { Order, Plan, PositionMessage, ProblemDetail, Shift } from '../../core/models';
 import { dateInZone, formatDateTime, formatTime, formatWindow } from '../../core/time';
 import { Confirm } from '../../shared/confirm';
 import { DateNav } from '../../shared/date-nav';
@@ -15,6 +15,8 @@ import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
 import { Live } from '../../core/live';
 import { MapDepot, MapRoute, MapStop, MapVehicle, RouteMap } from '../../shared/map/route-map';
+import { OrderDialog } from '../orders/order-dialog';
+import { ShiftDialog } from '../shifts/shift-dialog';
 import { PlanPreferences } from './plan-preferences';
 import { DEFAULT_PLAN_SETTINGS, PlanSettings, readPlanSettings, settingsValid, toSolveRequest, writePlanSettings } from './plan-settings';
 import { RouteView, buildPlanView, softCostLabel } from './plan-view';
@@ -23,7 +25,7 @@ interface SavedPlan { plan: Plan; solvedAt: string; publishedAt?: string; }
 
 @Component({
   selector: 'app-planning',
-  imports: [DecimalPipe, PercentPipe, RouterLink, Confirm, DateNav, Icon, LoadState, PlanPreferences, RouteMap],
+  imports: [DecimalPipe, PercentPipe, RouterLink, Confirm, DateNav, Icon, LoadState, OrderDialog, PlanPreferences, RouteMap, ShiftDialog],
   templateUrl: './planning.html',
   styleUrl: './planning.css',
 })
@@ -79,6 +81,29 @@ export class Planning {
       if (included) next.delete(id); else next.add(id);
       return next;
     });
+  }
+
+  // Add or edit a shift or order without leaving the page. null keeps a dialog closed
+  protected readonly shiftTarget = signal<Shift | 'new' | null>(null);
+  protected readonly orderTarget = signal<Order | 'new' | null>(null);
+  // A draft plan solved before an edit no longer matches what's ticked, so say so until it's solved again
+  protected readonly changedSinceSolve = signal(false);
+
+  protected shiftSaved(): void {
+    this.shiftTarget.set(null);
+    this.afterEdit();
+  }
+
+  protected orderSaved(): void {
+    this.orderTarget.set(null);
+    this.afterEdit();
+  }
+
+  // Reload the lists: a new shift or order shows up ticked, and an edited one shows its new details.
+  // An order moved to another day drops off this day's list.
+  private afterEdit(): void {
+    if (this.saved()) this.changedSinceSolve.set(true);
+    this.data.reload();
   }
 
   protected setAllOrders(included: boolean): void {
@@ -250,6 +275,7 @@ export class Planning {
     effect(() => {
       const key = this.storageKey();
       this.saved.set(readSaved(key));
+      this.changedSinceSolve.set(false);
       this.planSettings.set(readPlanSettings(this.ctx.id()));
       this.excludedOrders.set(new Set());
       this.excludedShifts.set(new Set());
@@ -299,6 +325,7 @@ export class Planning {
         stop();
         const saved: SavedPlan = { plan, solvedAt: new Date().toISOString() };
         this.saved.set(saved);
+        this.changedSinceSolve.set(false);
         localStorage.setItem(key, JSON.stringify(saved));
       },
       error: (error: unknown) => {
@@ -356,6 +383,7 @@ export class Planning {
   protected discardPlan(): void {
     localStorage.removeItem(this.storageKey());
     this.saved.set(null);
+    this.changedSinceSolve.set(false);
     this.highlighted.set(null);
   }
 

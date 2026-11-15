@@ -27,16 +27,24 @@
         <section class="card">
           <div class="card-head">
             <h2 class="section-title">Shifts <span class="count">{{ selectedShifts().length }}/{{ shifts().length }}</span></h2>
+            @if (ctx.isOwner()) {
+              <button type="button" class="link-btn add" [disabled]="solving()" (click)="shiftTarget.set('new')"><app-icon name="plus" [size]="14" /> Add shift</button>
+            }
           </div>
           <ul class="pick-list">
             @for (shift of shifts(); track shift.id) {
-              <li><label class="check pick">
+              <li class="pick-row"><label class="check pick">
                 <input type="checkbox" [checked]="!excludedShifts().has(shift.id)" (change)="toggle('shifts', shift.id, $any($event.target).checked)" />
                 <span class="pick-main"><strong>{{ shift.vehicleName }}</strong><span class="small muted">{{ shift.driverName || 'No driver yet' }}</span></span>
                 <span class="mono small nowrap">{{ time(shift.startAt) }}–{{ time(shift.endAt) }}</span>
-              </label></li>
+              </label>
+              @if (ctx.isOwner()) {
+                <button type="button" class="btn btn-quiet btn-icon edit" [disabled]="solving()" [attr.aria-label]="'Edit shift for ' + shift.vehicleName" (click)="shiftTarget.set(shift)"><app-icon name="pencil" /></button>
+              }</li>
             } @empty {
-              <li class="none">No shifts on this day. <a [routerLink]="ctx.link('shifts')">Add one</a> to plan routes.</li>
+              <li class="none">No shifts on this day.
+                @if (ctx.isOwner()) { <button type="button" class="link-btn" (click)="shiftTarget.set('new')">Add one</button> } @else { <a [routerLink]="ctx.link('shifts')">See Shifts</a> }
+                to plan routes.</li>
             }
           </ul>
         </section>
@@ -44,22 +52,26 @@
         <section class="card">
           <div class="card-head">
             <h2 class="section-title">Pending orders <span class="count">{{ selectedOrders().length }}/{{ candidates().length }}</span></h2>
-            @if (candidates().length > 0) {
-              <button type="button" class="link-btn" (click)="setAllOrders(excludedOrders().size > 0)">{{ excludedOrders().size > 0 ? 'Select all' : 'Clear' }}</button>
-            }
+            <div class="head-actions">
+              @if (candidates().length > 0) {
+                <button type="button" class="link-btn" (click)="setAllOrders(excludedOrders().size > 0)">{{ excludedOrders().size > 0 ? 'Select all' : 'Clear' }}</button>
+              }
+              <button type="button" class="link-btn add" [disabled]="solving()" (click)="orderTarget.set('new')"><app-icon name="plus" [size]="14" /> Add order</button>
+            </div>
           </div>
           <ul class="pick-list orders-list">
             @for (order of candidates(); track order.id) {
-              <li><label class="check pick">
+              <li class="pick-row"><label class="check pick">
                 <input type="checkbox" [checked]="!excludedOrders().has(order.id)" (change)="toggle('orders', order.id, $any($event.target).checked)" />
                 <span class="pick-main"><strong>{{ order.customer.name }}</strong><span class="small muted">{{ order.address.normalizedAddress || order.address.rawAddress }}</span></span>
                 <span class="pick-side small">
                   <span class="mono nowrap">{{ orderWindow(order.windowStart, order.windowEnd) }}</span>
                   <span class="muted nowrap">{{ order.totalWeightKg | number: '1.0-1' }} kg@if (order.windowStrict) {, strict}</span>
                 </span>
-              </label></li>
+              </label>
+              <button type="button" class="btn btn-quiet btn-icon edit" [disabled]="solving()" [attr.aria-label]="'Edit order for ' + order.customer.name" (click)="orderTarget.set(order)"><app-icon name="pencil" /></button></li>
             } @empty {
-              <li class="none">No pending orders for this day. <a [routerLink]="ctx.link('orders')">Create one</a>.</li>
+              <li class="none">No pending orders for this day. <button type="button" class="link-btn" (click)="orderTarget.set('new')">Create one</button>.</li>
             }
           </ul>
           @if (candidates().length > 0) {
@@ -74,6 +86,10 @@
         <app-route-map [routes]="mapRoutes()" [looseStops]="mapLoose()" [depots]="mapDepots()" [vehicles]="mapVehicles()" [highlighted]="highlighted()" />
 
         @if (view(); as plan) {
+          @if (changedSinceSolve() && !published()) {
+            <div class="banner banner-info" role="status"><app-icon name="info" />
+              <div>You changed shifts or orders after this plan was solved. <strong>Solve again</strong> to include the changes.</div></div>
+          }
           <p class="map-note small muted">Lines follow the roads in visiting order. A straight line means no road route was available for that vehicle. Square markers are depots.</p>
 
           <section class="card publish" [class.is-published]="published()" aria-label="Who can see this plan">
@@ -222,3 +238,6 @@
   [error]="publishError()"
   (confirmed)="publish()"
   (cancelled)="confirmPublish.set(false)" />
+
+<app-shift-dialog [target]="shiftTarget()" (saved)="shiftSaved()" (closed)="shiftTarget.set(null)" />
+<app-order-dialog [target]="orderTarget()" (saved)="orderSaved()" (closed)="orderTarget.set(null)" />

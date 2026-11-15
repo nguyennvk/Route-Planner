@@ -1,5 +1,5 @@
 import { decode } from '@googlemaps/polyline-codec';
-import { Depot, Order, Plan, Shift, Vehicle } from '../../core/models';
+import { Depot, Order, Plan, Shift, StopStatus, Vehicle } from '../../core/models';
 import { companyLocalToInstant } from '../../core/time';
 
 // Fixed order, validated with the dataviz palette checker against the white surface. Three of these are
@@ -45,6 +45,8 @@ export interface StopView {
   arrival: string | null;
   departure: string | null;
   minutesLate: number;
+  status: StopStatus;              // the driver's answer once the route is driven
+  failureReason: string | null;
 }
 
 export interface RouteView {
@@ -113,6 +115,8 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
         arrival: companyLocalToInstant(stop.arrivalTime, zone),
         departure: companyLocalToInstant(stop.departureTime, zone),
         minutesLate: stop.minutesLate,
+        status: stop.status ?? 'pending',     // missing on plans kept from before the API sent it
+        failureReason: stop.failureReason ?? null,
       };
     });
     const usedKg = stops.reduce((sum, stop) => sum + (stop.weightKg ?? 0), 0);

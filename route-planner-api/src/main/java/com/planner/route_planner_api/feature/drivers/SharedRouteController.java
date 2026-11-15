@@ -8,11 +8,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.planner.route_planner_api.feature.drivers.dto.DriverRejectRequest;
+import com.planner.route_planner_api.feature.drivers.dto.StopFailRequest;
 import com.planner.route_planner_api.feature.planning.dto.RouteResponse;
 
 import jakarta.validation.Valid;
 
-// Links that open without logging in; SecurityConfig permits GET /api/v1/shared/** and the four driver actions below.
+// Links that open without logging in; SecurityConfig permits GET /api/v1/shared/** and the driver actions below.
 // The token in the URL is the only permission, so treat it like a password (don't log it)
 @RestController
 @RequestMapping("/api/v1/shared")
@@ -50,5 +51,24 @@ public class SharedRouteController {
     @PostMapping("/routes/{token}/finish")
     public RouteResponse finishRouteByToken(@PathVariable String token) {
         return driverService.finishRouteByToken(token);
+    }
+
+    @PostMapping("/routes/{token}/stops/{stopId}/arrive")
+    public RouteResponse arriveStopByToken(@PathVariable String token, @PathVariable Long stopId) {
+        return driverService.arriveStopByToken(token, stopId);
+    }
+
+    @PostMapping("/routes/{token}/stops/{stopId}/deliver")
+    public RouteResponse deliverStopByToken(@PathVariable String token, @PathVariable Long stopId) {
+        return driverService.deliverStopByToken(token, stopId);
+    }
+
+    @PostMapping("/routes/{token}/stops/{stopId}/fail")
+    public RouteResponse failStopByToken(
+        @PathVariable String token,
+        @PathVariable Long stopId,
+        @Valid @RequestBody StopFailRequest request
+    ) {
+        return driverService.failStopByToken(token, stopId, request);
     }
 }

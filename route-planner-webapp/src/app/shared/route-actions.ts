@@ -56,7 +56,13 @@ type Stage = 'pending' | 'accepted' | 'rejected' | 'started' | 'finished' | 'loc
             }
             @case ('started') {
               <h2 id="actions-heading"><app-icon name="navigation" /> Route in progress</h2>
-              <p class="small muted">Started at <span class="mono">{{ clock(startedAt()) }}</span>.</p>
+              <p class="small muted">Started at <span class="mono">{{ clock(startedAt()) }}</span>.
+                @if (openStops() > 0) {
+                  Mark each stop as delivered or not delivered below; {{ openStops() }} {{ openStops() === 1 ? 'stop is' : 'stops are' }} still open.
+                } @else {
+                  Every stop is done. Finish the route when you're back at the depot.
+                }
+              </p>
             }
             @case ('finished') {
               <h2 id="actions-heading"><app-icon name="check" /> Route finished</h2>
@@ -82,7 +88,9 @@ type Stage = 'pending' | 'accepted' | 'rejected' | 'started' | 'finished' | 'loc
               <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="accept.emit()"><app-icon name="check" /> {{ busy() ? 'Sending…' : 'Accept after all' }}</button>
             }
             @case ('started') {
-              <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="form.set('finish')">Finish route</button>
+              <!-- The API refuses while a stop is open, so say why here rather than after a tap -->
+              <button type="button" class="btn btn-primary" [disabled]="busy() || openStops() > 0" (click)="form.set('finish')"
+                      [attr.title]="openStops() > 0 ? 'Answer every stop first' : null">Finish route</button>
             }
           }
         </div>
@@ -118,6 +126,7 @@ export class RouteActions {
   readonly answerOpen = input(true);              // RouteResponse.answerOpen
   readonly startedAt = input<string | null>(null);   // company wall clock, e.g. "2026-11-04T08:12:30"
   readonly finishedAt = input<string | null>(null);
+  readonly openStops = input(0);                     // stops without an answer yet; Finish waits for 0
   readonly busy = input(false);
   readonly error = input<string | null>(null);
   readonly accept = output<void>();

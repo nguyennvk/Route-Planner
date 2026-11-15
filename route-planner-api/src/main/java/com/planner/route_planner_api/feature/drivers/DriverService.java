@@ -21,10 +21,13 @@ import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.drivers.dto.DriverRejectRequest;
 import com.planner.route_planner_api.feature.drivers.dto.PositionMessage;
 import com.planner.route_planner_api.feature.drivers.dto.PositionRequest;
+import com.planner.route_planner_api.feature.drivers.dto.StopFailRequest;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
+import com.planner.route_planner_api.feature.planning.Plan;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
 import com.planner.route_planner_api.feature.planning.dto.RouteResponse;
+import com.planner.route_planner_api.feature.route.AssignementStatus;
 import com.planner.route_planner_api.feature.route.Route;
 import com.planner.route_planner_api.feature.route.RouteRepository;
 import com.planner.route_planner_api.feature.route.RouteStop;
@@ -138,6 +141,37 @@ public class DriverService {
         return finish(findSharedRoute(token));
     }
 
+    // The driver's answer for one stop. Each returns the whole route, so the app shows the new state at once
+    @Transactional
+    public RouteResponse arriveStop(Long userId, Long routeId, Long stopId) {
+        return arrive(findOwnRoute(userId, routeId), stopId);
+    }
+
+    @Transactional
+    public RouteResponse deliverStop(Long userId, Long routeId, Long stopId) {
+        return deliver(findOwnRoute(userId, routeId), stopId);
+    }
+
+    @Transactional
+    public RouteResponse failStop(Long userId, Long routeId, Long stopId, StopFailRequest request) {
+        return fail(findOwnRoute(userId, routeId), stopId, request.reason());
+    }
+
+    @Transactional
+    public RouteResponse arriveStopByToken(String token, Long stopId) {
+        return arrive(findSharedRoute(token), stopId);
+    }
+
+    @Transactional
+    public RouteResponse deliverStopByToken(String token, Long stopId) {
+        return deliver(findSharedRoute(token), stopId);
+    }
+
+    @Transactional
+    public RouteResponse failStopByToken(String token, Long stopId, StopFailRequest request) {
+        return fail(findSharedRoute(token), stopId, request.reason());
+    }
+
     @Transactional
     public void postDriverPosition(Long userId, Long routeId, PositionRequest request) {
         Route route = findOwnRoute(userId, routeId);
@@ -198,10 +232,73 @@ public class DriverService {
         return toResponse(route, stops);
     }
 
-    // Orders stay out_for_delivery: whether each one was delivered is a per-stop answer (RouteStop.deliver / fail)
+    // Every stop needs an answer first, so a customer never reads "not delivered" for a parcel that arrived
+    // but wasn't tapped. Stops whose order was cancelled after publishing are skipped: nobody drives there.
+    // The last route of a plan to finish completes the plan.
     private RouteResponse finish(Route route) {
+        List<RouteStop> stops = routeStopRepository.findByRoute(route);
+        stops.stream()
+            .filter(stop -> stop.isOpen() && stop.getOrder().getStatus() == OrderStatus.cancelled)
+            .forEach(RouteStop::skip);
+        List<Integer> open = stops.stream()
+            .filter(RouteStop::isOpen)
+            .map(stop -> stop.getSequence() + 1)
+            .sorted()
+            .toList();
+        if (!open.isEmpty()) {
+            throw new ConflictException("Mark every stop as delivered or not delivered before finishing. Still open: stop "
+                + open.stream().map(String::valueOf).collect(Collectors.joining(", ")));
+        }
         route.finish();
-        return toResponse(route);
+        completePlanIfDone(route.getPlan());
+        return toResponse(route, stops);
+    }
+
+    // Done when every route has finished or was turned down. A route nobody answered or started keeps the plan open
+    private void completePlanIfDone(Plan plan) {
+        if (plan.getStatus() != PlanStatus.published) return;
+        boolean done = routeRepository.findByPlan(plan).stream()
+            .allMatch(r -> r.getFinishedAt() != null || r.getAssignmentStatus() == AssignementStatus.rejected);
+        if (done) plan.complete();
+    }
+
+    private RouteResponse arrive(Route route, Long stopId) {
+        List<RouteStop> stops = routeStopRepository.findByRoute(route);
+        findStop(route, stops, stopId).arrive();
+        return toResponse(route, stops);
+    }
+
+    private RouteResponse deliver(Route route, Long stopId) {
+        List<RouteStop> stops = routeStopRepository.findByRoute(route);
+        RouteStop stop = findStop(route, stops, stopId);
+        requireNotCancelled(stop);
+        stop.deliver(null);
+        stop.getOrder().markDelivered();
+        return toResponse(route, stops);
+    }
+
+    private RouteResponse fail(Route route, Long stopId, String reason) {
+        List<RouteStop> stops = routeStopRepository.findByRoute(route);
+        RouteStop stop = findStop(route, stops, stopId);
+        requireNotCancelled(stop);
+        stop.fail(reason.trim());
+        stop.getOrder().markFailed();
+        return toResponse(route, stops);
+    }
+
+    // Only on a route being driven, and only a stop of this route: another route's stop id looks like "not found"
+    private static RouteStop findStop(Route route, List<RouteStop> stops, Long stopId) {
+        route.requireInProgress();
+        return stops.stream()
+            .filter(stop -> stop.getId().equals(stopId))
+            .findFirst()
+            .orElseThrow(() -> new ResourceNotFoundException("Stop", stopId));
+    }
+
+    private static void requireNotCancelled(RouteStop stop) {
+        if (stop.getOrder().getStatus() == OrderStatus.cancelled) {
+            throw new ConflictException("This order was cancelled, so there's nothing to deliver");
+        }
     }
 
     // Someone else's route, an unpublished one, or a company the driver left all look like "not found",

@@ -11,6 +11,7 @@ import { Brand } from '../../shared/brand';
 import { Icon } from '../../shared/icon';
 import { MapRoute, RouteMap } from '../../shared/map/route-map';
 import { RouteActions, actionErrorMessage } from '../../shared/route-actions';
+import { StopActions } from '../../shared/stop-actions';
 import { ROUTE_COLORS, decodePath } from '../planning/plan-view';
 
 // /route/{token}: the driver's link that opens without logging in, e.g. from a text message.
@@ -18,7 +19,7 @@ import { ROUTE_COLORS, decodePath } from '../planning/plan-view';
 // raw addresses, wall-clock times and the road path.
 @Component({
   selector: 'app-shared-route',
-  imports: [RouterLink, Brand, Icon, RouteActions, RouteMap],
+  imports: [RouterLink, Brand, Icon, RouteActions, RouteMap, StopActions],
   templateUrl: './shared-route.html',
   styleUrl: './shared-route.css',
 })
@@ -59,6 +60,13 @@ export class SharedRoute {
   protected reject(reason: string | null): void { this.act(this.api.rejectSharedRoute(this.token(), reason)); }
   protected start(): void { this.act(this.api.startSharedRoute(this.token())); }
   protected finish(): void { this.act(this.api.finishSharedRoute(this.token())); }
+  protected arriveStop(stopId: number): void { this.act(this.api.arriveSharedStop(this.token(), stopId)); }
+  protected deliverStop(stopId: number): void { this.act(this.api.deliverSharedStop(this.token(), stopId)); }
+  protected failStop(stopId: number, reason: string): void { this.act(this.api.failSharedStop(this.token(), stopId, reason)); }
+
+  // Stops still waiting for the driver's answer; Finish waits for 0
+  protected readonly openStops = computed(() => this.stops().filter((stop) => stop.status === 'pending' || stop.status === 'arrived').length);
+  protected readonly inProgress = computed(() => this.data.hasValue() && !!this.data.value().startedAt && !this.data.value().finishedAt);
 
   private act(request: Observable<PlanRoute>): void {
     if (this.acting()) return;

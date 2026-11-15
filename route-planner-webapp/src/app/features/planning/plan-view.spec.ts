@@ -15,7 +15,7 @@ const shift: Shift = { id: 20, vehicleId: 7, vehicleName: 'Van 7', driverUserId:
 const planBase = { planId: 1, name: 'p', status: 'draft' as const, planDate: '2026-11-02' };
 
 const stop = (orderId: number, sequence: number, minutesLate = 0) => ({
-  stopId: orderId * 10, sequence, orderId, name: 'raw', arrivalTime: '2026-11-02T09:00:00', departureTime: '2026-11-02T09:05:00', minutesLate,
+  stopId: orderId * 10, sequence, orderId, name: 'raw', arrivalTime: '2026-11-02T09:00:00', departureTime: '2026-11-02T09:05:00', minutesLate, status: 'pending' as const, failureReason: null,
 });
 
 describe('parseScore', () => {

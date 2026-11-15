@@ -8,7 +8,7 @@ const address = (id: number, raw: string, normalized: string | null = null): Add
 const vehicle: Vehicle = { id: 7, name: 'Van 7', type: 'van', capacityKg: 100, capacityM3: null, homeDepotId: 3, active: true };
 const depot = { id: 3, name: 'Main', address: address(9, 'Depot St') } as Depot;
 const stop = (stopId: number, sequence: number, name: string, arrival: string, minutesLate = 0) => ({
-  stopId, sequence, orderId: stopId, name, arrivalTime: arrival, departureTime: arrival.replace(/:00:00$/, ':05:00'), minutesLate,
+  stopId, sequence, orderId: stopId, name, arrivalTime: arrival, departureTime: arrival.replace(/:00:00$/, ':05:00'), minutesLate, status: 'pending' as const, failureReason: null,
 });
 const route = (routeId: number, vehicleId: number, stops: PlanRoute['stops']): PlanRoute => ({ routeId, shiftId: 1, vehicleId, stops, geometry: null, assignmentStatus: 'pending', rejectionReason: null, answerOpen: true, startedAt: null, finishedAt: null, shareToken: `t${routeId}` });
 
@@ -41,5 +41,17 @@ describe('buildDriverRoutes', () => {
     const [view] = buildDriverRoutes([route(1, 7, [stop(10, 0, '5 Gone Rd', '2026-11-09T09:00:00')])], lookups, 'America/Toronto');
     expect(view.stops[0]).toMatchObject({ address: '5 Gone Rd', latitude: null, longitude: null });
     expect(view.unplacedCount).toBe(1);
+  });
+
+  it('counts the stops still waiting for an answer, which Finish route waits on', () => {
+    const [view] = buildDriverRoutes([route(1, 7, [
+      { ...stop(10, 0, '1 Main St', '2026-11-09T09:00:00'), status: 'delivered' },
+      { ...stop(11, 1, '2 King St', '2026-11-09T10:00:00'), status: 'arrived' },
+      { ...stop(12, 2, '2 King St', '2026-11-09T11:00:00'), status: 'failed', failureReason: 'No one home' },
+      stop(13, 3, '1 Main St', '2026-11-09T12:00:00'),
+      { ...stop(14, 4, '1 Main St', '2026-11-09T13:00:00'), status: 'skipped' },
+    ])], lookups, 'America/Toronto');
+    expect(view.openCount).toBe(2);   // the arrived one and the pending one
+    expect(view.stops[2]).toMatchObject({ status: 'failed', failureReason: 'No one home' });
   });
 });

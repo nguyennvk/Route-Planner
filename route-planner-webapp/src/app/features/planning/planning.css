@@ -83,3 +83,4 @@
 /* Which of this day's plans is on screen */
 .plan-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .plan-picker select { flex: 1; min-width: 220px; max-width: 460px; }
+.stop-result { display: inline-flex; width: fit-content; margin-top: 3px; }

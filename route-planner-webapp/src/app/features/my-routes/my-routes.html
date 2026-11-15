@@ -63,7 +63,7 @@
 
             <app-route-actions [routeId]="route.routeId" [status]="route.assignmentStatus" [rejectionReason]="route.rejectionReason"
                                [answerOpen]="route.answerOpen" [startedAt]="route.startedAt" [finishedAt]="route.finishedAt"
-                               [busy]="acting() === route.routeId"
+                               [openStops]="route.openCount" [busy]="acting() === route.routeId"
                                [error]="actionError()?.routeId === route.routeId ? actionError()!.message : null"
                                (accept)="accept(route.routeId)" (reject)="reject(route.routeId, $event)"
                                (start)="start(route.routeId)" (finish)="finish(route.routeId)" />
@@ -86,6 +86,10 @@
                     <span class="small muted">Arrive <span class="mono">{{ time(stop.arrival) }}</span>, leave <span class="mono">{{ time(stop.departure) }}</span></span>
                   </span>
                   @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }
+                  <app-stop-actions class="stop-answer" [stopId]="stop.stopId" [status]="stop.status" [failureReason]="stop.failureReason"
+                                    [active]="!!route.startedAt && !route.finishedAt" [busy]="acting() === route.routeId"
+                                    (arrive)="arriveStop(route.routeId, stop.stopId)" (deliver)="deliverStop(route.routeId, stop.stopId)"
+                                    (fail)="failStop(route.routeId, stop.stopId, $event)" />
                 </li>
               }
               @if (route.depot) {

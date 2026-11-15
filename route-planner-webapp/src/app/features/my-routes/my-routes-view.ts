@@ -1,4 +1,4 @@
-import { Address, AssignmentStatus, Depot, PlanRoute, Vehicle } from '../../core/models';
+import { Address, AssignmentStatus, Depot, PlanRoute, StopStatus, Vehicle } from '../../core/models';
 import { companyLocalToInstant, dateInZone } from '../../core/time';
 import { decodePath } from '../planning/plan-view';
 
@@ -11,6 +11,8 @@ export interface DriverStopView {
   arrival: string | null;
   departure: string | null;
   minutesLate: number;
+  status: StopStatus;
+  failureReason: string | null;
 }
 
 export interface DriverRouteView {
@@ -24,6 +26,7 @@ export interface DriverRouteView {
   path: [number, number][] | null;
   lateCount: number;
   unplacedCount: number;          // stops with no pin, listed but not on the map
+  openCount: number;              // stops still waiting for the driver's answer
   assignmentStatus: AssignmentStatus;
   rejectionReason: string | null;
   answerOpen: boolean;
@@ -63,6 +66,8 @@ export function buildDriverRoutes(routes: PlanRoute[], { vehicles, depots, addre
         arrival: companyLocalToInstant(stop.arrivalTime, zone),
         departure: companyLocalToInstant(stop.departureTime, zone),
         minutesLate: stop.minutesLate,
+        status: stop.status,
+        failureReason: stop.failureReason,
       };
     });
     const firstArrival = stops[0]?.arrival ?? null;
@@ -77,6 +82,7 @@ export function buildDriverRoutes(routes: PlanRoute[], { vehicles, depots, addre
       path: route.geometry ? decodePath(route.geometry) : null,
       lateCount: stops.filter((stop) => stop.minutesLate > 0).length,
       unplacedCount: stops.filter((stop) => stop.latitude === null).length,
+      openCount: stops.filter((stop) => stop.status === 'pending' || stop.status === 'arrived').length,
       assignmentStatus: route.assignmentStatus,
       rejectionReason: route.rejectionReason,
       answerOpen: route.answerOpen,

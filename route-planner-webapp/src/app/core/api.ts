@@ -123,6 +123,10 @@ export class Api {
   rejectMyRoute(routeId: number, reason: string | null) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/reject`, { reason }); }
   startMyRoute(routeId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/start`, null); }
   finishMyRoute(routeId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/finish`, null); }
+  // One stop's answer while the route is in progress; each returns the whole route
+  arriveMyStop(routeId: number, stopId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/stops/${stopId}/arrive`, null); }
+  deliverMyStop(routeId: number, stopId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/stops/${stopId}/deliver`, null); }
+  failMyStop(routeId: number, stopId: number, reason: string) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/stops/${stopId}/fail`, { reason }); }
   postDriverPosition(routeId: number, position: { latitude: number; longitude: number; speedKmh: number | null }) {
     return this.http.post<void>(`${API}/drivers/me/routes/${routeId}/position`, position);
   }
@@ -133,6 +137,9 @@ export class Api {
   rejectSharedRoute(token: string, reason: string | null) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/reject`, { reason }); }
   startSharedRoute(token: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/start`, null); }
   finishSharedRoute(token: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/finish`, null); }
+  arriveSharedStop(token: string, stopId: number) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/stops/${stopId}/arrive`, null); }
+  deliverSharedStop(token: string, stopId: number) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/stops/${stopId}/deliver`, null); }
+  failSharedStop(token: string, stopId: number, reason: string) { return this.http.post<PlanRoute>(`${API}/shared/routes/${encodeURIComponent(token)}/stops/${stopId}/fail`, { reason }); }
 
   // Customer's tracking link: no login either, the token is the permission
   trackOrder(token: string) { return this.http.get<Tracking>(`${API}/track/${encodeURIComponent(token)}`); }

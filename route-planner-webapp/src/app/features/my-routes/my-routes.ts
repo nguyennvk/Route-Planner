@@ -13,12 +13,13 @@ import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
 import { MapDepot, MapRoute, MapVehicle, RouteMap } from '../../shared/map/route-map';
 import { RouteActions, actionErrorMessage } from '../../shared/route-actions';
+import { StopActions } from '../../shared/stop-actions';
 import { ROUTE_COLORS } from '../planning/plan-view';
 import { DriverRouteView, buildDriverRoutes } from './my-routes-view';
 
 @Component({
   selector: 'app-my-routes',
-  imports: [NgTemplateOutlet, RouterLink, Icon, LoadState, RouteActions, RouteMap],
+  imports: [NgTemplateOutlet, RouterLink, Icon, LoadState, RouteActions, RouteMap, StopActions],
   templateUrl: './my-routes.html',
   styleUrl: './my-routes.css',
 })
@@ -163,6 +164,11 @@ export class MyRoutes {
   protected start(routeId: number): void { this.act(routeId, this.api.startMyRoute(routeId)); }
 
   protected finish(routeId: number): void { this.act(routeId, this.api.finishMyRoute(routeId)); }
+
+  // A stop's answer comes back as the whole route, swapped in like the route actions
+  protected arriveStop(routeId: number, stopId: number): void { this.act(routeId, this.api.arriveMyStop(routeId, stopId)); }
+  protected deliverStop(routeId: number, stopId: number): void { this.act(routeId, this.api.deliverMyStop(routeId, stopId)); }
+  protected failStop(routeId: number, stopId: number, reason: string): void { this.act(routeId, this.api.failMyStop(routeId, stopId, reason)); }
 
   private act(routeId: number, request: Observable<PlanRoute>): void {
     if (this.acting() !== null) return;

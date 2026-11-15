@@ -145,9 +145,13 @@ public class Route {
         }
     }
 
+    // For anything the driver does while out: positions, stop answers
     public void requireInProgress() {
         if (this.startedAt == null) {
-            throw new ConflictException("Start the route before finishing it");
+            throw new ConflictException("Start the route first");
+        }
+        if (this.finishedAt != null) {
+            throw new ConflictException("This route has finished");
         }
     }
 

@@ -32,3 +32,8 @@
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 560px; }
 .empty h2 { font-size: 18px; font-weight: 700; }
+
+/* The driver's answer for a stop sits at the end of its row, and drops below it on a phone */
+.stop { flex-wrap: wrap; }
+.stop-answer { margin-left: auto; }
+@media (max-width: 560px) { .stop-answer { flex-basis: 100%; padding-left: 40px; } }

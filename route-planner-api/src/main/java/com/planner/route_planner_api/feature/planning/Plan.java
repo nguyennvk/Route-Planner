@@ -76,7 +76,11 @@ public class Plan extends BaseEntity {
         this.publishedAt = Instant.now();
     }
 
+    // Every route is finished or was turned down; DriverService calls this when the last route finishes
     public void complete() {
+        if (status != PlanStatus.published) {
+            throw new ConflictException("Only a published plan can be completed; this one is " + status);
+        }
         this.status = PlanStatus.completed;
     }
 

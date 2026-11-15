@@ -248,7 +248,12 @@ export interface PlanStop {
   arrivalTime: string | null;
   departureTime: string | null;
   minutesLate: number;
+  status: StopStatus;
+  failureReason: string | null;   // the driver's reason when status is 'failed'
 }
+
+// The driver's answer for a stop. skipped: its order was cancelled, so nobody went there
+export type StopStatus = 'pending' | 'arrived' | 'delivered' | 'failed' | 'skipped';
 
 // RouteResponse.java: what a plan holds per vehicle, and what GET /drivers/me/routes lists for a driver
 // The driver's answer to a published route; they can change it until the route starts

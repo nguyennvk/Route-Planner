@@ -178,6 +178,24 @@ public class Order extends BaseEntity {
         this.status = OrderStatus.out_for_delivery;
     }
 
+    // The driver handed it over (RouteStop.deliver)
+    public void markDelivered() {
+        requireOutForDelivery();
+        this.status = OrderStatus.delivered;
+    }
+
+    // The driver couldn't deliver it (RouteStop.fail); the owner arranges another try
+    public void markFailed() {
+        requireOutForDelivery();
+        this.status = OrderStatus.failed;
+    }
+
+    private void requireOutForDelivery() {
+        if (status != OrderStatus.out_for_delivery) {
+            throw new ConflictException("Order " + getId() + " is " + status + ", not out for delivery");
+        }
+    }
+
     public void cancel() {
         this.status = OrderStatus.cancelled;
     }

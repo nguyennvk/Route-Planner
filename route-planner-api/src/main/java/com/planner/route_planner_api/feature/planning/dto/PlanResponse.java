@@ -15,6 +15,7 @@ import com.planner.route_planner_api.feature.planning.Plan;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
 import com.planner.route_planner_api.feature.route.Route;
 import com.planner.route_planner_api.feature.route.RouteStop;
+import com.planner.route_planner_api.feature.route.StopStatus;
 
 import ai.timefold.solver.core.api.score.HardMediumSoftScore;
 
@@ -37,7 +38,9 @@ public record PlanResponse(
         String name,
         LocalDateTime arrivalTime,
         LocalDateTime departureTime,
-        long minutesLate
+        long minutesLate,
+        StopStatus status,          // pending until the driver answers: arrived, delivered, failed or skipped
+        String failureReason        // the driver's reason when status is failed
     ) {}
 
     public static PlanResponse from(Plan plan, List<Route> routes, List<RouteStop> stops, List<Long> unassignedOrderIds) {
@@ -71,7 +74,9 @@ public record PlanResponse(
             order.getAddress().getRawAddress(),
             ZonedTime.toLocalDateTime(stop.getPlannedArrival(), zone),
             ZonedTime.toLocalDateTime(stop.getPlannedDeparture(), zone),
-            minutesLate(stop.getPlannedDeparture(), order.getWindowEnd())
+            minutesLate(stop.getPlannedDeparture(), order.getWindowEnd()),
+            stop.getStatus(),
+            stop.getFailureReason()
         );
     }
 

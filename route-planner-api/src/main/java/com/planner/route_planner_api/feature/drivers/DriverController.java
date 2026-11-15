@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.planner.route_planner_api.feature.drivers.dto.DriverRejectRequest;
 import com.planner.route_planner_api.feature.drivers.dto.PositionRequest;
+import com.planner.route_planner_api.feature.drivers.dto.StopFailRequest;
 import com.planner.route_planner_api.feature.planning.dto.RouteResponse;
 
 import jakarta.validation.Valid;
@@ -82,6 +83,27 @@ public class DriverController {
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
         return driverService.finishRoute(userId, routeId);
+    }
+
+    // The driver's answer for one stop while the route is in progress
+    @PostMapping("/{routeId}/stops/{stopId}/arrive")
+    public RouteResponse arriveStop(@AuthenticationPrincipal Jwt jwt, @PathVariable Long routeId, @PathVariable Long stopId) {
+        return driverService.arriveStop(Long.valueOf(jwt.getSubject()), routeId, stopId);
+    }
+
+    @PostMapping("/{routeId}/stops/{stopId}/deliver")
+    public RouteResponse deliverStop(@AuthenticationPrincipal Jwt jwt, @PathVariable Long routeId, @PathVariable Long stopId) {
+        return driverService.deliverStop(Long.valueOf(jwt.getSubject()), routeId, stopId);
+    }
+
+    @PostMapping("/{routeId}/stops/{stopId}/fail")
+    public RouteResponse failStop(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long routeId,
+        @PathVariable Long stopId,
+        @Valid @RequestBody StopFailRequest request
+    ) {
+        return driverService.failStop(Long.valueOf(jwt.getSubject()), routeId, stopId, request);
     }
 
     @PostMapping("/{routeId}/position")

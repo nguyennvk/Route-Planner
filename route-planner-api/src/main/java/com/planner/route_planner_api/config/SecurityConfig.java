@@ -62,7 +62,10 @@ public class SecurityConfig {
                     "/api/v1/shared/routes/*/accept",
                     "/api/v1/shared/routes/*/reject",
                     "/api/v1/shared/routes/*/start",
-                    "/api/v1/shared/routes/*/finish").permitAll()
+                    "/api/v1/shared/routes/*/finish",
+                    "/api/v1/shared/routes/*/stops/*/arrive",
+                    "/api/v1/shared/routes/*/stops/*/deliver",
+                    "/api/v1/shared/routes/*/stops/*/fail").permitAll()
                 .anyRequest().authenticated()
             ).oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
         return http.build();

@@ -15,7 +15,7 @@
 
     <app-route-actions [routeId]="route.routeId" [status]="route.assignmentStatus" [rejectionReason]="route.rejectionReason"
                        [answerOpen]="route.answerOpen" [startedAt]="route.startedAt" [finishedAt]="route.finishedAt"
-                       [busy]="acting()" [error]="actionError()"
+                       [openStops]="openStops()" [busy]="acting()" [error]="actionError()"
                        (accept)="accept()" (reject)="reject($event)" (start)="start()" (finish)="finish()" />
 
     @if (mapRoutes().length > 0) {
@@ -31,6 +31,9 @@
             <span class="small muted">Arrive <span class="mono">{{ time(stop.arrivalTime) }}</span>, leave <span class="mono">{{ time(stop.departureTime) }}</span></span>
           </span>
           @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }
+          <app-stop-actions class="stop-answer" [stopId]="stop.stopId" [status]="stop.status" [failureReason]="stop.failureReason"
+                            [active]="inProgress()" [busy]="acting()"
+                            (arrive)="arriveStop(stop.stopId)" (deliver)="deliverStop(stop.stopId)" (fail)="failStop(stop.stopId, $event)" />
         </li>
       }
     </ol>

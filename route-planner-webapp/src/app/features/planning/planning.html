@@ -185,7 +185,15 @@
                           <td><span class="seq" [style.background]="route.fill" [style.color]="route.ink">{{ stop.sequence + 1 }}</span></td>
                           <td class="mono nowrap">{{ time(stop.arrival) }}</td>
                           <td class="mono nowrap">{{ time(stop.departure) }}</td>
-                          <td>{{ stop.customerName }}<span class="cell-sub">{{ stop.address }}</span></td>
+                          <td>{{ stop.customerName }}<span class="cell-sub">{{ stop.address }}</span>
+                            @switch (stop.status) {
+                              @case ('delivered') { <span class="badge badge-ok stop-result">Delivered</span> }
+                              @case ('failed') { <span class="badge badge-danger stop-result" [attr.title]="stop.failureReason">Not delivered</span>
+                                @if (stop.failureReason) { <span class="cell-sub">{{ stop.failureReason }}</span> } }
+                              @case ('arrived') { <span class="badge badge-info stop-result">Driver arrived</span> }
+                              @case ('skipped') { <span class="badge stop-result">Skipped</span> }
+                            }
+                          </td>
                           <td class="nowrap">
                             {{ orderWindow(stop.windowStart, stop.windowEnd) }}@if (stop.windowStrict) {<span class="muted">, strict</span>}
                             @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }

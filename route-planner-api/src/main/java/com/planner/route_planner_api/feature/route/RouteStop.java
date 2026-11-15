@@ -66,18 +66,38 @@ public class RouteStop {
         this.actualArrival = Instant.now();
     }
 
+    // From arrived, or straight from pending when the driver didn't tap Arrived first
     public void deliver(String proofPhotoUrl) {
-        requireStatus(StopStatus.arrived);
+        requireOpen();
+        markArrivedIfNot();
         this.status = StopStatus.delivered;
         this.proofPhotoUrl = proofPhotoUrl;
         this.actualDeparture = Instant.now();
     }
 
+    // Also from pending: a driver who couldn't even reach the door never arrived
     public void fail(String reason) {
-        requireStatus(StopStatus.arrived);
+        requireOpen();
         this.status = StopStatus.failed;
         this.failureReason = reason;
         this.actualDeparture = Instant.now();
+    }
+
+    // Still waiting for the driver's answer: not delivered, failed or skipped yet
+    public boolean isOpen() {
+        return this.status == StopStatus.pending || this.status == StopStatus.arrived;
+    }
+
+    private void requireOpen() {
+        if (!isOpen()) {
+            throw new ConflictException("This stop is already " + this.status);
+        }
+    }
+
+    private void markArrivedIfNot() {
+        if (this.actualArrival == null) {
+            this.actualArrival = Instant.now();
+        }
     }
 
     // Driver never went there, e.g. the order was cancelled mid-route

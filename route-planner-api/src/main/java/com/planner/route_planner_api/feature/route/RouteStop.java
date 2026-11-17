@@ -45,6 +45,9 @@ public class RouteStop {
     private String failureReason;
     private String proofPhotoUrl;
 
+    @Version 
+    private int version;
+
     protected RouteStop() {}
 
     public RouteStop(Route route, Order order, Integer sequence, Instant plannedArrival, Instant plannedDeparture) {

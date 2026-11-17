@@ -30,6 +30,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 
 // One delivery: what (items), to whom (customer), where (address) and when (time window).
@@ -84,6 +85,9 @@ public class Order extends BaseEntity {
     // cascade ALL: lines are saved/updated with the order. orphanRemoval: a line taken out of this list is deleted.
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
+
+    @Version
+    private int version;
 
     protected Order() {}
 

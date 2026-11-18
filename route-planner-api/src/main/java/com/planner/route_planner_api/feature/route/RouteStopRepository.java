@@ -34,5 +34,8 @@ public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     // Stops planned before this one that aren't finished yet (pending, arrived)
     int countByRouteIdAndSequenceLessThanAndStatusIn(Long routeId, Integer sequence,
                                                   Collection<StopStatus> statuses);
-    Optional<RouteStop> findByOrder(Order order);
+
+    // The order's stop on the published plan. Drafts hold stops for the same order too, so a plain findByOrder
+    // finds several rows and throws; an order can only be planned on one published plan (markPlanned checks)
+    Optional<RouteStop> findByOrderAndRoute_Plan_Status(Order order, PlanStatus status);
 }

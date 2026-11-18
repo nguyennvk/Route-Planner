@@ -35,6 +35,9 @@ import com.planner.route_planner_api.feature.orders.dto.OrderItemRequest;
 import com.planner.route_planner_api.feature.orders.dto.OrderRequest;
 import com.planner.route_planner_api.feature.orders.dto.OrderResponse;
 import com.planner.route_planner_api.feature.orders.dto.UpdateOrderRequest;
+import com.planner.route_planner_api.feature.planning.PlanStatus;
+import com.planner.route_planner_api.feature.route.RouteStop;
+import com.planner.route_planner_api.feature.route.RouteStopRepository;
 
 import jakarta.persistence.criteria.Predicate;
 
@@ -49,6 +52,7 @@ public class OrderService {
     private final CustomerRepository customerRepository;
     private final ItemRepository itemRepository;
     private final AddressRepository addressRepository;
+    private final RouteStopRepository routeStopRepository;
     private final CompanyAccess companyAccess;
 
     public OrderService(
@@ -56,12 +60,14 @@ public class OrderService {
             CustomerRepository customerRepository,
             ItemRepository itemRepository,
             AddressRepository addressRepository,
+            RouteStopRepository routeStopRepository,
             CompanyAccess companyAccess
         ){
         this.orderRepository = orderRepository;
         this.customerRepository = customerRepository;
         this.itemRepository = itemRepository;
         this.addressRepository = addressRepository;
+        this.routeStopRepository = routeStopRepository;
         this.companyAccess = companyAccess;
     }
 
@@ -168,6 +174,12 @@ public class OrderService {
         Order order = findOrderForOwner(orderId, userId);
         if (order.getStatus() != OrderStatus.pending && order.getStatus() != OrderStatus.planned) {
             throw new ConflictException("An order that is " + order.getStatus() + " can't be cancelled");
+        }
+        // Planned: its stop is on a route a driver already has, so mark it skipped and nobody drives there.
+        // The route hasn't started (the order would be out_for_delivery), so the stop is still pending
+        if (order.getStatus() == OrderStatus.planned) {
+            routeStopRepository.findByOrderAndRoute_Plan_Status(order, PlanStatus.published)
+                .ifPresent(RouteStop::skip);
         }
         order.cancel();
         return OrderResponse.from(order);

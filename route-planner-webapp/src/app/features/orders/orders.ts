@@ -70,7 +70,12 @@ export class Orders {
   protected readonly cancelRunner = new FormRunner();
   protected readonly cancelMessage = computed(() => {
     const order = this.cancelling();
-    return order ? `Order #${order.id} for ${order.customer.name} stays on record as cancelled and won't be planned.` : '';
+    if (!order) return '';
+    const who = `Order #${order.id} for ${order.customer.name}`;
+    // A planned order is already on a driver's route: say that the stop goes away, not just that it won't be planned
+    return order.status === 'planned'
+      ? `${who} is on a route sent to a driver. The stop stays on their route marked as cancelled, and they won't go there.`
+      : `${who} stays on record as cancelled and won't be planned.`;
   });
 
   protected openCancel(order: Order): void {

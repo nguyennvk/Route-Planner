@@ -18,15 +18,29 @@
                        [openStops]="openStops()" [busy]="acting()" [error]="actionError()"
                        (accept)="accept()" (reject)="reject($event)" (start)="start()" (finish)="finish()" />
 
+    @if (nextStop(); as next) {
+      <button type="button" class="next-card" (click)="scrollToStop(next.stopId)">
+        <span class="seq next-seq" aria-hidden="true">{{ next.sequence + 1 }}</span>
+        <span class="next-main">
+          <span class="next-label">{{ next.status === 'arrived' ? "You're at stop" : 'Next stop' }} {{ next.sequence + 1 }}</span>
+          <strong>{{ next.name }}</strong>
+          <span class="small">Arrive <span class="mono">{{ time(next.arrivalTime) }}</span>@if (next.minutesLate > 0) { <span class="late-text">, {{ next.minutesLate }} min late</span> }</span>
+        </span>
+        <span class="next-go small">Show in list <app-icon name="chevron-down" [size]="14" /></span>
+      </button>
+    }
+
     @if (mapRoutes().length > 0) {
       <app-route-map [routes]="mapRoutes()" />
     }
 
     <ol class="stops" aria-label="Stops in driving order">
       @for (stop of stops(); track stop.stopId) {
-        <li class="stop">
+        @let isNext = stop.stopId === nextStop()?.stopId;
+        <li class="stop" [id]="'stop-' + stop.stopId" [class.next]="isNext" [class.done]="isDone(stop.status)" [attr.aria-current]="isNext ? 'step' : null">
           <span class="seq" aria-hidden="true">{{ stop.sequence + 1 }}</span>
           <span class="stop-main">
+            @if (isNext) { <span class="next-tag">{{ stop.status === 'arrived' ? "You're here" : 'Next stop' }}</span> }
             <strong><span class="visually-hidden">Stop {{ stop.sequence + 1 }}: </span>{{ stop.name }}</strong>
             <span class="small muted">Arrive <span class="mono">{{ time(stop.arrivalTime) }}</span>, leave <span class="mono">{{ time(stop.departureTime) }}</span></span>
           </span>

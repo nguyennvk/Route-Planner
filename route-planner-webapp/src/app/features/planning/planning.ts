@@ -56,8 +56,8 @@ export class Planning {
   protected readonly plannedOrders = rxResource({
     params: () => (this.saved() && this.saved()!.plan.status !== 'draft' ? { id: this.ctx.id() } : undefined),
     // Drivers move orders on to out_for_delivery, then delivered or failed; an old plan from the history
-    // can have orders in any of these
-    stream: ({ params: { id } }) => forkJoin((['planned', 'out_for_delivery', 'delivered', 'failed'] as const).map((status) =>
+    // can have orders in any of these. Cancelled ones stay on the route as skipped stops, so they're loaded too
+    stream: ({ params: { id } }) => forkJoin((['planned', 'out_for_delivery', 'delivered', 'failed', 'cancelled'] as const).map((status) =>
       fetchAll((page) => this.api.orders(id, { status, page, size: MAX_PAGE_SIZE })))).pipe(map((lists) => lists.flat())),
   });
 

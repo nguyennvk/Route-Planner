@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Depot, Order, Plan, Shift, Vehicle } from '../../core/models';
-import { ROUTE_COLORS, buildPlanView, parseScore, softCostLabel } from './plan-view';
+import { ROUTE_COLORS, buildPlanView, parseScore, softCostLabel, stopProgress } from './plan-view';
 
 const order = (id: number, weight: number): Order => ({
   id, totalWeightKg: weight, status: 'pending', items: [], windowStart: null, windowEnd: null, windowStrict: false,
@@ -84,5 +84,23 @@ describe('buildPlanView', () => {
     expect(view.routes[0].stops[0].address).toBe('raw');
     expect(view.routes[0].stops[0].latitude).toBeNull();
     expect(view.unassigned[0].customerName).toBe('Order #99');
+  });
+});
+
+describe('stopProgress', () => {
+  it("prefers the driver's answer on the stop over the order's status", () => {
+    expect(stopProgress('delivered', 'out_for_delivery').label).toBe('Delivered');
+    expect(stopProgress('arrived', 'out_for_delivery').label).toBe('Driver arrived');
+    expect(stopProgress('failed', 'out_for_delivery').badge).toBe('badge-danger');
+  });
+  it("falls back to the order's status before the driver gets there", () => {
+    expect(stopProgress('pending', 'pending').label).toBe('Not sent');
+    expect(stopProgress('pending', 'planned').label).toBe('Planned');
+    expect(stopProgress('pending', 'out_for_delivery').label).toBe('Out for delivery');
+    expect(stopProgress('pending', null).label).toBe('Pending');
+  });
+  it('says cancelled when a skipped stop is a cancelled order', () => {
+    expect(stopProgress('skipped', 'cancelled').label).toBe('Cancelled');
+    expect(stopProgress('skipped', null).label).toBe('Skipped');
   });
 });

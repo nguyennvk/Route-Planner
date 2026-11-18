@@ -11,7 +11,7 @@ import { Brand } from '../../shared/brand';
 import { Icon } from '../../shared/icon';
 import { MapRoute, RouteMap } from '../../shared/map/route-map';
 import { RouteActions, actionErrorMessage } from '../../shared/route-actions';
-import { StopActions } from '../../shared/stop-actions';
+import { StopActions, isDone, nextStopId, scrollToStop } from '../../shared/stop-actions';
 import { ROUTE_COLORS, decodePath } from '../planning/plan-view';
 
 // /route/{token}: the driver's link that opens without logging in, e.g. from a text message.
@@ -89,4 +89,10 @@ export class SharedRoute {
 
   protected day(date: string | null): string { return date ? formatDay(date) : 'No stops'; }
   protected time(local: string | null): string { return local ? local.slice(11, 16) : '–'; }
+  protected readonly isDone = isDone;
+  protected readonly scrollToStop = scrollToStop;
+  protected readonly nextStop = computed(() => {
+    const id = nextStopId(this.stops(), this.inProgress());
+    return this.stops().find((stop) => stop.stopId === id) ?? null;
+  });
 }

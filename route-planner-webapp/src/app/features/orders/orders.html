@@ -45,6 +45,9 @@
               <td class="row-actions">
                 @if (order.status === 'pending') {
                   <button type="button" class="btn btn-small" (click)="dialogTarget.set(order)"><app-icon name="pencil" /> Edit</button>
+                }
+                <!-- Same rule as OrderService.cancelOrder: only before the driver sets off -->
+                @if (order.status === 'pending' || order.status === 'planned') {
                   <button type="button" class="btn btn-small btn-danger" (click)="openCancel(order)">Cancel</button>
                 }
                 @if (order.trackingToken) {

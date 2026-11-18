@@ -13,7 +13,7 @@ import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
 import { MapDepot, MapRoute, MapVehicle, RouteMap } from '../../shared/map/route-map';
 import { RouteActions, actionErrorMessage } from '../../shared/route-actions';
-import { StopActions } from '../../shared/stop-actions';
+import { StopActions, isDone, scrollToStop } from '../../shared/stop-actions';
 import { ROUTE_COLORS } from '../planning/plan-view';
 import { DriverRouteView, buildDriverRoutes } from './my-routes-view';
 
@@ -199,4 +199,11 @@ export class MyRoutes {
   }
 
   protected time(instant: string | null): string { return formatTime(instant, this.ctx.zone()); }
+  protected readonly isDone = isDone;
+  protected readonly scrollToStop = scrollToStop;
+  // The stop the "Next stop" card describes
+  protected readonly nextStop = computed(() => {
+    const route = this.selected();
+    return route?.stops.find((stop) => stop.stopId === route.nextStopId) ?? null;
+  });
 }

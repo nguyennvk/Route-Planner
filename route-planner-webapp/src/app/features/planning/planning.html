@@ -174,36 +174,41 @@
                 </header>
                 <div class="table-scroll">
                   <table class="data stops">
-                    <thead><tr><th>#</th><th>Arrive</th><th>Leave</th><th>Customer</th><th>Window</th><th class="num">Weight</th></tr></thead>
+                    <thead><tr><th>#</th><th>Arrive</th><th>Leave</th><th>Order</th><th>Window</th><th class="num">Weight</th><th>Status</th></tr></thead>
                     <tbody>
                       @if (route.depot) {
                         <tr class="depot-row"><td></td><td></td><td class="mono nowrap">{{ route.leaves ? time(route.leaves) : '' }}</td>
-                          <td colspan="3" class="muted">{{ route.leaves ? 'Leaves' : 'Starts at' }} {{ route.depot.name }}</td></tr>
+                          <td colspan="4" class="muted">{{ route.leaves ? 'Leaves' : 'Starts at' }} {{ route.depot.name }}</td></tr>
                       }
                       @for (stop of route.stops; track stop.orderId) {
                         <tr>
                           <td><span class="seq" [style.background]="route.fill" [style.color]="route.ink">{{ stop.sequence + 1 }}</span></td>
                           <td class="mono nowrap">{{ time(stop.arrival) }}</td>
                           <td class="mono nowrap">{{ time(stop.departure) }}</td>
-                          <td>{{ stop.customerName }}<span class="cell-sub">{{ stop.address }}</span>
-                            @switch (stop.status) {
-                              @case ('delivered') { <span class="badge badge-ok stop-result">Delivered</span> }
-                              @case ('failed') { <span class="badge badge-danger stop-result" [attr.title]="stop.failureReason">Not delivered</span>
-                                @if (stop.failureReason) { <span class="cell-sub">{{ stop.failureReason }}</span> } }
-                              @case ('arrived') { <span class="badge badge-info stop-result">Driver arrived</span> }
-                              @case ('skipped') { <span class="badge stop-result">Skipped</span> }
-                            }
+                          <td class="order-cell">
+                            <span class="customer">{{ stop.customerName }}</span><span class="cell-sub">{{ stop.address }}</span>
+                            <span class="order-meta small">
+                              <span class="mono">#{{ stop.orderId }}</span>
+                              @if (stop.itemCount > 0) { <span [attr.title]="stop.items">{{ stop.itemCount }} {{ stop.itemCount === 1 ? 'item' : 'items' }}: {{ stop.items }}</span> }
+                              @if (stop.serviceMinutes !== null) { <span>{{ stop.serviceMinutes }} min at stop</span> }
+                              @if (stop.phone) { <a [href]="'tel:' + stop.phone">{{ stop.phone }}</a> }
+                            </span>
+                            @if (stop.notes) { <span class="order-note small"><app-icon name="info" [size]="13" /> {{ stop.notes }}</span> }
                           </td>
                           <td class="nowrap">
                             {{ orderWindow(stop.windowStart, stop.windowEnd) }}@if (stop.windowStrict) {<span class="muted">, strict</span>}
                             @if (stop.minutesLate > 0) { <span class="badge badge-danger late">{{ stop.minutesLate }} min late</span> }
                           </td>
                           <td class="num nowrap">{{ stop.weightKg === null ? '–' : (stop.weightKg | number: '1.0-1') + ' kg' }}</td>
+                          <td class="status-cell">
+                            <span class="badge" [class]="stop.progress.badge">{{ stop.progress.label }}</span>
+                            @if (stop.status === 'failed' && stop.failureReason) { <span class="cell-sub">{{ stop.failureReason }}</span> }
+                          </td>
                         </tr>
                       }
                       @if (route.depot && route.returns) {
                         <tr class="depot-row"><td></td><td class="mono nowrap">{{ time(route.returns) }}</td><td></td>
-                          <td colspan="3" class="muted">Back at {{ route.depot.name }}</td></tr>
+                          <td colspan="4" class="muted">Back at {{ route.depot.name }}</td></tr>
                       }
                     </tbody>
                   </table>

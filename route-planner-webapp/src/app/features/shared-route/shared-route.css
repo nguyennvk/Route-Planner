@@ -20,3 +20,24 @@ app-route-map { --map-height: 320px; }
 .stop { flex-wrap: wrap; }
 .stop-answer { margin-left: auto; }
 @media (max-width: 560px) { .stop-answer { flex-basis: 100%; padding-left: 40px; } }
+
+/* The next stop: tinted, a bar down its left edge, a bigger number, and a label. Answered stops fade back.
+   Kept in step with the other driver page (my-routes.css / shared-route.css) */
+.stop.next { background: var(--brand-soft); box-shadow: inset 4px 0 0 var(--brand); scroll-margin: 80px; }
+.stop.next .seq { width: 34px; height: 34px; background: var(--brand); font-size: 15px; box-shadow: 0 0 0 4px rgb(255 255 255 / 85%); }
+.stop.next .stop-main strong { font-weight: 700; font-size: 16px; }
+.next-tag { display: inline-block; margin-bottom: 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brand); }
+.stop.done .seq, .stop.done .stop-main { opacity: 0.5; }
+.stop.done .stop-main strong { font-weight: 500; }
+
+/* Above the map: where to go now. Tapping it scrolls the list to that stop */
+.next-card { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  background: var(--surface); border: 2px solid var(--brand); border-radius: var(--radius-l); }
+.next-card:hover { background: var(--brand-soft); }
+.next-seq { width: 40px; height: 40px; font-size: 17px; background: var(--brand); }
+.next-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.next-main strong { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.next-label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brand); }
+.late-text { color: var(--danger); font-weight: 600; }
+.next-go { flex: none; display: inline-flex; align-items: center; gap: 2px; color: var(--brand); font-weight: 600; }
+@media (max-width: 560px) { .next-go { display: none; } }

@@ -1,12 +1,12 @@
 import { Component, ElementRef, effect, inject, input } from '@angular/core';
 import {
-  ArrowLeft, ArrowRight, Boxes, Building2, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock, History, IconNode,
+  ArrowLeft, ArrowRight, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock, History, IconNode,
   Info, LayoutDashboard, Link, LogOut, MapPin, Menu, Navigation, Package, Pencil, Plus, RefreshCw, Route, Search, Settings, Trash2, TriangleAlert,
   Truck, Users, UserRound, Warehouse, X, createElement,
 } from 'lucide';
 
 const ICONS = {
-  'arrow-left': ArrowLeft, 'arrow-right': ArrowRight, boxes: Boxes, building: Building2, 'chevron-left': ChevronLeft,
+  'arrow-left': ArrowLeft, 'arrow-right': ArrowRight, boxes: Boxes, building: Building2, 'chevron-down': ChevronDown, 'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight, alert: CircleAlert, check: CircleCheck, clock: Clock, history: History, info: Info,
   dashboard: LayoutDashboard, link: Link, logout: LogOut, pin: MapPin, menu: Menu, navigation: Navigation, package: Package, pencil: Pencil, plus: Plus,
   refresh: RefreshCw, route: Route, search: Search, settings: Settings, trash: Trash2, warning: TriangleAlert, truck: Truck, users: Users,

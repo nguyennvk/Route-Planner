@@ -1,5 +1,5 @@
 import { decode } from '@googlemaps/polyline-codec';
-import { Depot, Order, Plan, Shift, StopStatus, Vehicle } from '../../core/models';
+import { Depot, Order, OrderStatus, Plan, Shift, StopStatus, Vehicle } from '../../core/models';
 import { companyLocalToInstant } from '../../core/time';
 
 // Fixed order, validated with the dataviz palette checker against the white surface. Three of these are
@@ -47,6 +47,38 @@ export interface StopView {
   minutesLate: number;
   status: StopStatus;              // the driver's answer once the route is driven
   failureReason: string | null;
+  orderStatus: OrderStatus | null; // null when the order wasn't in the lookups
+  items: string;                   // "2 × Water box, 1 × Bag"; empty when unknown
+  itemCount: number;
+  serviceMinutes: number | null;
+  phone: string | null;
+  notes: string | null;
+  progress: StopProgress;
+}
+
+export interface StopProgress {
+  label: string;
+  badge: string;                   // badge modifier class; '' is the neutral gray
+}
+
+// One status per stop. The driver's answer on the stop wins once there is one: it's what happened at the door.
+// Before that, the order's own status says how far along it is (not sent yet, planned, out for delivery).
+export function stopProgress(stop: StopStatus, order: OrderStatus | null): StopProgress {
+  switch (stop) {
+    case 'delivered': return { label: 'Delivered', badge: 'badge-ok' };
+    case 'failed': return { label: 'Not delivered', badge: 'badge-danger' };
+    case 'arrived': return { label: 'Driver arrived', badge: 'badge-info' };
+    case 'skipped': return { label: order === 'cancelled' ? 'Cancelled' : 'Skipped', badge: '' };
+  }
+  switch (order) {
+    case 'pending': return { label: 'Not sent', badge: 'badge-warn' };
+    case 'planned': return { label: 'Planned', badge: 'badge-info' };
+    case 'out_for_delivery': return { label: 'Out for delivery', badge: 'badge-info' };
+    case 'delivered': return { label: 'Delivered', badge: 'badge-ok' };
+    case 'failed': return { label: 'Not delivered', badge: 'badge-danger' };
+    case 'cancelled': return { label: 'Cancelled', badge: '' };
+    default: return { label: 'Pending', badge: '' };
+  }
 }
 
 export interface RouteView {
@@ -117,6 +149,13 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
         minutesLate: stop.minutesLate,
         status: stop.status ?? 'pending',     // missing on plans kept from before the API sent it
         failureReason: stop.failureReason ?? null,
+        orderStatus: order?.status ?? null,
+        items: order?.items.map((line) => `${line.quantity} × ${line.name}`).join(', ') ?? '',
+        itemCount: order?.items.reduce((sum, line) => sum + line.quantity, 0) ?? 0,
+        serviceMinutes: order?.serviceMinutes ?? null,
+        phone: order?.customer.phone ?? null,
+        notes: order?.notes?.trim() || null,
+        progress: stopProgress(stop.status ?? 'pending', order?.status ?? null),
       };
     });
     const usedKg = stops.reduce((sum, stop) => sum + (stop.weightKg ?? 0), 0);

@@ -1,5 +1,6 @@
 import { Address, AssignmentStatus, Depot, PlanRoute, StopStatus, Vehicle } from '../../core/models';
 import { companyLocalToInstant, dateInZone } from '../../core/time';
+import { nextStopId } from '../../shared/stop-actions';
 import { decodePath } from '../planning/plan-view';
 
 export interface DriverStopView {
@@ -27,6 +28,7 @@ export interface DriverRouteView {
   lateCount: number;
   unplacedCount: number;          // stops with no pin, listed but not on the map
   openCount: number;              // stops still waiting for the driver's answer
+  nextStopId: number | null;      // the stop to drive to now; null unless the route is in progress
   assignmentStatus: AssignmentStatus;
   rejectionReason: string | null;
   answerOpen: boolean;
@@ -83,6 +85,7 @@ export function buildDriverRoutes(routes: PlanRoute[], { vehicles, depots, addre
       lateCount: stops.filter((stop) => stop.minutesLate > 0).length,
       unplacedCount: stops.filter((stop) => stop.latitude === null).length,
       openCount: stops.filter((stop) => stop.status === 'pending' || stop.status === 'arrived').length,
+      nextStopId: nextStopId(stops, !!route.startedAt && !route.finishedAt),
       assignmentStatus: route.assignmentStatus,
       rejectionReason: route.rejectionReason,
       answerOpen: route.answerOpen,

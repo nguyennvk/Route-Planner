@@ -4,6 +4,24 @@ import { Icon } from './icon';
 
 export const FAIL_REASON_MAX = 500;   // StopFailRequest's @Size
 
+// The stop the driver is heading to (or standing at): the first one in driving order with no answer yet.
+// Only while the route is in progress; before the start and after the finish there's no "next".
+// stops must already be sorted by sequence.
+export function nextStopId(stops: readonly { stopId: number; status: StopStatus }[], inProgress: boolean): number | null {
+  if (!inProgress) return null;
+  return stops.find((stop) => stop.status === 'pending' || stop.status === 'arrived')?.stopId ?? null;
+}
+
+// Answered stops fade back so the open ones, and the next one most of all, stand out
+export function isDone(status: StopStatus): boolean {
+  return status === 'delivered' || status === 'failed' || status === 'skipped';
+}
+
+// Brings a stop's row to the middle of the screen; the row's id is stop-<stopId>
+export function scrollToStop(stopId: number): void {
+  document.getElementById(`stop-${stopId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 // One tap for the usual cases; "Other" opens a text box
 const QUICK_REASONS = ['No one home', "Couldn't find the address", 'Customer refused it', "Couldn't get access"];
 

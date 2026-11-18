@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Address, Depot, PlanRoute, Vehicle } from '../../core/models';
+import { nextStopId } from '../../shared/stop-actions';
 import { buildDriverRoutes } from './my-routes-view';
 
 const address = (id: number, raw: string, normalized: string | null = null): Address => ({
@@ -53,5 +54,36 @@ describe('buildDriverRoutes', () => {
     ])], lookups, 'America/Toronto');
     expect(view.openCount).toBe(2);   // the arrived one and the pending one
     expect(view.stops[2]).toMatchObject({ status: 'failed', failureReason: 'No one home' });
+  });
+});
+
+describe('nextStopId', () => {
+  const stops = [
+    { stopId: 1, status: 'delivered' as const },
+    { stopId: 2, status: 'skipped' as const },
+    { stopId: 3, status: 'pending' as const },
+    { stopId: 4, status: 'pending' as const },
+  ];
+
+  it('is the first stop in driving order with no answer yet', () => {
+    expect(nextStopId(stops, true)).toBe(3);
+  });
+  it('stays on a stop the driver has arrived at but not answered', () => {
+    expect(nextStopId([{ stopId: 5, status: 'arrived' }, { stopId: 6, status: 'pending' }], true)).toBe(5);
+  });
+  it('is null before the start, after the finish, or once every stop is answered', () => {
+    expect(nextStopId(stops, false)).toBeNull();
+    expect(nextStopId([{ stopId: 1, status: 'delivered' }], true)).toBeNull();
+  });
+});
+
+describe('buildDriverRoutes next stop', () => {
+  it('only points at a stop while the route is in progress', () => {
+    const lookups = { vehicles: [vehicle], depots: [depot], addresses: [] };
+    const stops = [stop(1, 0, 'A', '2026-11-02T09:00:00'), stop(2, 1, 'B', '2026-11-02T10:00:00')];
+    const notStarted = buildDriverRoutes([route(1, 7, stops)], lookups, 'America/Toronto')[0];
+    const started = buildDriverRoutes([{ ...route(1, 7, stops), startedAt: '2026-11-02T08:30:00' }], lookups, 'America/Toronto')[0];
+    expect(notStarted.nextStopId).toBeNull();
+    expect(started.nextStopId).toBe(1);
   });
 });

@@ -68,6 +68,18 @@
                                (accept)="accept(route.routeId)" (reject)="reject(route.routeId, $event)"
                                (start)="start(route.routeId)" (finish)="finish(route.routeId)" />
 
+            @if (nextStop(); as next) {
+              <button type="button" class="next-card" (click)="scrollToStop(next.stopId)">
+                <span class="seq next-seq" aria-hidden="true">{{ next.sequence + 1 }}</span>
+                <span class="next-main">
+                  <span class="next-label">{{ next.status === 'arrived' ? "You're at stop" : 'Next stop' }} {{ next.sequence + 1 }}</span>
+                  <strong>{{ next.address }}</strong>
+                  <span class="small">Arrive <span class="mono">{{ time(next.arrival) }}</span>@if (next.minutesLate > 0) { <span class="late-text">, {{ next.minutesLate }} min late</span> }</span>
+                </span>
+                <span class="next-go small">Show in list <app-icon name="chevron-down" [size]="14" /></span>
+              </button>
+            }
+
             <app-route-map [routes]="mapRoutes()" [depots]="mapDepots()" [vehicles]="mapVehicles()" />
             @if (route.unplacedCount > 0) {
               <p class="small muted">{{ route.unplacedCount }} {{ route.unplacedCount === 1 ? "stop isn't" : "stops aren't" }} on the map because the address has no pin. Every stop is listed below.</p>
@@ -79,9 +91,11 @@
                   <span class="stop-main"><strong>Start at {{ route.depot.name }}</strong><span class="small muted">{{ route.depot.address.normalizedAddress || route.depot.address.rawAddress }}</span></span></li>
               }
               @for (stop of route.stops; track stop.stopId) {
-                <li class="stop">
+                @let isNext = stop.stopId === route.nextStopId;
+                <li class="stop" [id]="'stop-' + stop.stopId" [class.next]="isNext" [class.done]="isDone(stop.status)" [attr.aria-current]="isNext ? 'step' : null">
                   <span class="seq" aria-hidden="true">{{ stop.sequence + 1 }}</span>
                   <span class="stop-main">
+                    @if (isNext) { <span class="next-tag">{{ stop.status === 'arrived' ? "You're here" : 'Next stop' }}</span> }
                     <strong><span class="visually-hidden">Stop {{ stop.sequence + 1 }}: </span>{{ stop.address }}</strong>
                     <span class="small muted">Arrive <span class="mono">{{ time(stop.arrival) }}</span>, leave <span class="mono">{{ time(stop.departure) }}</span></span>
                   </span>

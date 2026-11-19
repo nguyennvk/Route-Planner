@@ -2,6 +2,7 @@ package com.planner.route_planner_api.feature.planning;
 
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -133,18 +134,19 @@ public class PlanningService {
         companyAccess.requireOwner(companyMember);
         List<Order> orders = orderRepository.findByCompanyIdAndStatusAndIdIn(companyId, OrderStatus.pending, request.orderIds());
         Map<Long, Order> ordersById = orders.stream().collect(Collectors.toMap(Order::getId, Function.identity()));
+        Company company = companyMember.getCompany();
         // Get invalid orderIds
         List<Long> invalidOrderIds = extractInvalidIds(orders, request.orderIds(), Order::getId);
 
         // Retrieve data from request
         List<VehicleShift> shifts = vehicleShiftRepository.findByVehicleCompanyIdAndIdIn(companyId, request.shiftIds());
+        requireShiftsOnSameDate(shifts, request.planDate(), ZoneId.of(company.getTimezone()));
         Map<Long, VehicleShift> shiftsById = shifts.stream().collect(Collectors.toMap(VehicleShift::getId, Function.identity()));
 
         // Get invalid shiftIds
         List<Long> invalidShiftIds = extractInvalidIds(shifts, request.shiftIds(), VehicleShift::getId);
 
         // The solver works in the company's wall-clock time; convert back to Instant when saving
-        Company company = companyMember.getCompany();
         ZoneId zone = company.zoneId();
 
         List<PlannedVehicle> plannedVehicles = getPlannedVehicles(shifts, zone);
@@ -270,6 +272,18 @@ public class PlanningService {
         List<Route> routes = routeRepository.findByPlan(plan);
         List<RouteStop> stops = routes.isEmpty() ? List.of() : routeStopRepository.findByRouteIn(routes);
         return PlanResponse.from(plan, routes, stops, List.of());
+    }
+
+    private static void requireShiftsOnSameDate(List<VehicleShift> shifts, LocalDate date, ZoneId zone) {
+        Instant dayStart = ZonedTime.startOfDay(date, zone);
+        Instant dayEnd = ZonedTime.startOfDay(date.plusDays(1), zone);
+        List<Long> otherDays = shifts.stream()
+            .filter(shift -> !(shift.getStartAt().isBefore(dayEnd) && shift.getEndAt().isAfter(dayStart)))
+            .map(VehicleShift::getId)
+            .toList();
+        if (!otherDays.isEmpty()) {
+            throw new BadRequestException("These shifts aren't on " + date + ": " + otherDays);
+        }
     }
 
     // Drivers see their own routes on My routes, not whole plans

@@ -8,6 +8,7 @@ import com.planner.route_planner_api.feature.planning.constraints.PlanPreference
 import com.planner.route_planner_api.feature.planning.constraints.PlanScorePreference;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 
@@ -17,6 +18,7 @@ public record PlanRequest(
     @NotNull
     List<Long> orderIds,
     @NotNull
+    @NotEmpty 
     List<Long> shiftIds,
     // Prices per shift, keyed by shiftId; every shift being solved needs an entry
     @NotNull

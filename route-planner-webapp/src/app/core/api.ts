@@ -135,7 +135,9 @@ export class Api {
   arriveMyStop(routeId: number, stopId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/stops/${stopId}/arrive`, null); }
   deliverMyStop(routeId: number, stopId: number) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/stops/${stopId}/deliver`, null); }
   failMyStop(routeId: number, stopId: number, reason: string) { return this.http.post<PlanRoute>(`${API}/drivers/me/routes/${routeId}/stops/${stopId}/fail`, { reason }); }
-  postDriverPosition(routeId: number, position: { latitude: number; longitude: number; speedKmh: number | null }) {
+  // recordedAt: when the phone took the fix (ISO instant). The API keeps only positions newer than the stored one,
+  // so a late request can't move the van backwards
+  postDriverPosition(routeId: number, position: { latitude: number; longitude: number; speedKmh: number | null; recordedAt: string }) {
     return this.http.post<void>(`${API}/drivers/me/routes/${routeId}/position`, position);
   }
 

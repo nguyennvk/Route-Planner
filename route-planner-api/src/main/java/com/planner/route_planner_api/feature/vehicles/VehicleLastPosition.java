@@ -19,6 +19,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 
 @Entity
@@ -45,21 +46,26 @@ public class VehicleLastPosition {
     @Column(nullable = false)
     private Instant recordedAt;
 
+    @Version 
+    private Integer version;
+
     protected VehicleLastPosition() {}
 
-    public VehicleLastPosition(Route route, Double latitude, Double longitude, BigDecimal speedKmh) {
+    public VehicleLastPosition(Route route, Double latitude, Double longitude, BigDecimal speedKmh, Instant recordedAt) {
         this.vehicleId = route.getVehicle().getId();
         this.route = route;
         this.location = GEOMETRY.createPoint(new Coordinate(longitude, latitude));
         this.speedKmh = speedKmh;
-        this.recordedAt = Instant.now();
+        this.recordedAt = recordedAt;
     }
 
-    public void moveTo(Route route, Double latitude, Double longitude, BigDecimal speedKmh) {
+    public boolean moveTo(Route route, Double latitude, Double longitude, BigDecimal speedKmh, Instant recordedAt) {
+        if (!recordedAt.isAfter(this.recordedAt)) return false;
         this.route = route;
         this.location = GEOMETRY.createPoint(new Coordinate(longitude, latitude));
         this.speedKmh = speedKmh;
-        this.recordedAt = Instant.now();
+        this.recordedAt = recordedAt;
+        return true;
     }
 
     public Double getLatitude() {

@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { Observable, forkJoin, retry } from 'rxjs';
+import { Observable, forkJoin } from 'rxjs';
 import { Api, MAX_PAGE_SIZE, fetchAll } from '../../core/api';
 import { CompanyContext } from '../../core/company-context';
 import { errorMessage } from '../../core/errors';
@@ -16,6 +16,9 @@ import { RouteActions, actionErrorMessage } from '../../shared/route-actions';
 import { StopActions, isDone, scrollToStop } from '../../shared/stop-actions';
 import { ROUTE_COLORS } from '../planning/plan-view';
 import { DriverRouteView, buildDriverRoutes } from './my-routes-view';
+
+// At most one GPS fix sent to the server per this many ms (the phone may report one every second)
+const SEND_EVERY_MS = 10_000;
 
 @Component({
   selector: 'app-my-routes',
@@ -90,6 +93,8 @@ export class MyRoutes {
   // the effect below starts it from the route's state (started, not finished) rather than from the Start click.
   private watchId: number | null = null;
   private watchedRouteId: number | null = null;
+  // Phone time of the last fix sent to the API; null = send the next one straight away
+  private lastSentAt: number | null = null;
 
   // The phone's own latest GPS fix. The driver doesn't need the websocket for this: it's the same fix
   // onFix sends to the API, so the van moves on their map without a round trip to the server
@@ -126,6 +131,7 @@ export class MyRoutes {
     if (this.watchId !== null) navigator.geolocation.clearWatch(this.watchId);
     this.watchId = null;
     this.watchedRouteId = routeId;
+    this.lastSentAt = null;                                 // a new route's first fix goes out at once
     this.myPosition.set(null);                              // a fix from the previous route doesn't belong on this one
     if (routeId === null || !('geolocation' in navigator)) return;
     this.watchId = navigator.geolocation.watchPosition(
@@ -136,22 +142,27 @@ export class MyRoutes {
   }
 
   private onFix(position: GeolocationPosition, routeId: number): void {
+    // The driver's own map follows every fix: it's local, costs nothing
     this.myPosition.set({
       routeId,
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
       at: new Date(position.timestamp).toISOString(),       // an instant, so time() shows it on the company's clock
     });
+
+    // The server gets one fix per SEND_EVERY_MS. watchPosition can fire every second while driving; the owner's
+    // map and the customer's ETA don't need that, and fewer requests means fewer that can overlap
+    if (this.lastSentAt !== null && position.timestamp - this.lastSentAt < SEND_EVERY_MS) return;
+    this.lastSentAt = position.timestamp;
+
+    // No retry: a fix resent seconds later is already stale, and the next one is at most SEND_EVERY_MS away.
+    // Errors are dropped for the same reason (a 409 just means another request won the race)
     this.api.postDriverPosition(routeId, {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
       speedKmh: position.coords.speed === null ? null : position.coords.speed * 3.6,   // m/s → km/h
-    }).pipe(
-      retry({count: 3, delay: 3_000})
-    ).subscribe({
-      error: () => {}
-    });
-
+      recordedAt: new Date(position.timestamp).toISOString(),   // when the phone took it, not when it arrives
+    }).subscribe({ error: () => {} });
   }
 
   private onError(error: GeolocationPositionError): void {

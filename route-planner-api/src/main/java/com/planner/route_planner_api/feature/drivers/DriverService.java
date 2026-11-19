@@ -3,6 +3,7 @@ package com.planner.route_planner_api.feature.drivers;
 import com.planner.route_planner_api.feature.vehicles.VehicleLastPosition;
 import com.planner.route_planner_api.feature.vehicles.VehicleLastPositionRepository;
 
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
@@ -178,17 +179,22 @@ public class DriverService {
     public void postDriverPosition(Long userId, Long routeId, PositionRequest request) {
         Route route = findOwnRoute(userId, routeId);
         route.requireInProgress();
+        ZoneId zone = route.getPlan().getCompany().zoneId();
         Optional<VehicleLastPosition> existing = vehicleLastPositionRepository.findById(route.getVehicle().getId());
         VehicleLastPosition position;
+        Instant now = Instant.now();
+        Instant recordedAt = request.recordedAt().isAfter(now) ? now : request.recordedAt();
+        boolean stored = true;
         if (existing.isPresent()) {
             position = existing.get();
-            position.moveTo(route, request.latitude(), request.longitude(), request.speedKmh());
+            stored = position.moveTo(route, request.latitude(), request.longitude(), request.speedKmh(), recordedAt);
         } else {
             position = vehicleLastPositionRepository.save(
-                new VehicleLastPosition(route, request.latitude(), request.longitude(), request.speedKmh()));
+                new VehicleLastPosition(route, request.latitude(), request.longitude(), request.speedKmh(), recordedAt));
         }
-        ZoneId zone = route.getPlan().getCompany().zoneId();
 
+        if (!stored) return;
+        vehicleLastPositionRepository.flush();
         // Broadcast to the subscribers
         simpMessagingTemplate.convertAndSend(
             "/topic/routes/" + routeId + "/position",

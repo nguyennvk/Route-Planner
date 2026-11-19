@@ -15,6 +15,7 @@ import { ROUTE_COLORS, decodePath } from '../planning/plan-view';
 const REFRESH_MS = 20_000;
 // Below this, "late" is normal day-to-day drift and apologising would be noise
 const LATE_NOTICE_MINUTES = 15;
+// not_scheduled isn't final: the page keeps polling so the new time shows up once the shop plans it again
 const FINAL: TrackingStage[] = ['delivered', 'failed'];
 
 // /track/{token}: the customer's link, no login. Shows only their own order: the van appears once it's coming
@@ -53,6 +54,7 @@ export class TrackOrder {
     if (!this.data.hasValue()) return '';
     const t = this.data.value();
     switch (t.stage) {
+      case 'not_scheduled': return 'Your delivery is being rescheduled';
       case 'scheduled': return this.isToday(t.planDate) ? 'Your order is out for delivery today' : `Your order is scheduled for ${formatDay(t.planDate)}`;
       case 'on_the_way': return 'Your order is on its way';
       case 'next': return "You're next!";

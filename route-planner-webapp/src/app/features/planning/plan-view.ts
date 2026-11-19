@@ -1,5 +1,5 @@
 import { decode } from '@googlemaps/polyline-codec';
-import { Depot, Order, OrderStatus, Plan, Shift, StopStatus, Vehicle } from '../../core/models';
+import { AssignmentStatus, Depot, Order, OrderStatus, Plan, PlanRoute, Shift, StopStatus, Vehicle } from '../../core/models';
 import { companyLocalToInstant } from '../../core/time';
 
 // Fixed order, validated with the dataviz palette checker against the white surface. Three of these are
@@ -68,7 +68,8 @@ export function stopProgress(stop: StopStatus, order: OrderStatus | null): StopP
     case 'delivered': return { label: 'Delivered', badge: 'badge-ok' };
     case 'failed': return { label: 'Not delivered', badge: 'badge-danger' };
     case 'arrived': return { label: 'Driver arrived', badge: 'badge-info' };
-    case 'skipped': return { label: order === 'cancelled' ? 'Cancelled' : 'Skipped', badge: '' };
+    // Not cancelled: the route was released and the order went back to the planning list
+    case 'skipped': return { label: order === 'cancelled' ? 'Cancelled' : 'Released', badge: '' };
   }
   switch (order) {
     case 'pending': return { label: 'Not sent', badge: 'badge-warn' };
@@ -78,6 +79,20 @@ export function stopProgress(stop: StopStatus, order: OrderStatus | null): StopP
     case 'failed': return { label: 'Not delivered', badge: 'badge-danger' };
     case 'cancelled': return { label: 'Cancelled', badge: '' };
     default: return { label: 'Pending', badge: '' };
+  }
+}
+
+// One status per route, for the owner. Released is the owner's own final word, and starting and finishing are what
+// the driver actually did, so all three win over the earlier accept/reject answer.
+// Only meaningful once the plan is sent: a draft has nobody to answer it yet.
+export function routeProgress(route: Pick<PlanRoute, 'assignmentStatus' | 'startedAt' | 'finishedAt' | 'releasedAt'>): StopProgress {
+  if (route.releasedAt) return { label: 'Released', badge: '' };
+  if (route.finishedAt) return { label: 'Finished', badge: 'badge-ok' };
+  if (route.startedAt) return { label: 'On the road', badge: 'badge-info' };
+  switch (route.assignmentStatus) {
+    case 'accepted': return { label: 'Accepted', badge: 'badge-ok' };
+    case 'rejected': return { label: 'Turned down', badge: 'badge-danger' };
+    default: return { label: 'Waiting for driver', badge: 'badge-warn' };
   }
 }
 
@@ -97,6 +112,11 @@ export interface RouteView {
   leaves: string | null;            // instant the van leaves the depot / gets back; null on older saved plans
   returns: string | null;
   shareToken: string | null;        // null on plans saved in the browser before the API returned it
+  assignmentStatus: AssignmentStatus;
+  rejectionReason: string | null;   // the driver's words when they turned it down
+  progress: StopProgress;           // routeProgress: the badge in the route card's header
+  released: boolean;                // closed by the owner: no driver link, its orders are back to pending
+  canRelease: boolean;              // turned down and not released yet: the owner can put its orders back
 }
 
 export interface PlanView {
@@ -176,6 +196,11 @@ export function buildPlanView(plan: Plan, { orders, shifts, vehicles, depots }: 
       path: route.geometry ? decodePath(route.geometry) : null,
       leaves: companyLocalToInstant(route.plannedStart ?? null, zone),
       returns: companyLocalToInstant(route.plannedEnd ?? null, zone),
+      assignmentStatus: route.assignmentStatus ?? 'pending',   // missing on plans kept from before the API sent it
+      rejectionReason: route.rejectionReason ?? null,
+      progress: routeProgress(route),
+      released: !!route.releasedAt,
+      canRelease: route.assignmentStatus === 'rejected' && !route.releasedAt,
     };
   });
 

@@ -63,6 +63,7 @@ public class Route {
     private Instant respondedAt;
     private String rejectionReason;
     private String geometry;
+    private Instant releasedAt;
     
     @Version 
     private int version;
@@ -118,6 +119,9 @@ public class Route {
         if (this.startedAt != null) {
             throw new ConflictException("This route has already started");
         }
+        if (this.releasedAt != null) {
+            throw new ConflictException("This route has been released.");
+        }
         this.startedAt = Instant.now();
     }
 
@@ -131,9 +135,19 @@ public class Route {
         this.finishedAt = Instant.now();
     }
 
+    public void release(){
+        if (this.assignmentStatus != AssignementStatus.rejected) {
+            throw new ConflictException("Release can only be done on rejected route.");
+        }
+        if (releasedAt != null) {
+            throw new ConflictException("This route was already released");
+        }
+        this.releasedAt = Instant.now();
+    }
+
     // Read by RouteResponse so the app only offers "change answer" when the API would allow it
     public boolean isAnswerOpen(){
-        return this.startedAt == null && this.finishedAt == null && this.plan.getStatus() != PlanStatus.completed;
+        return this.startedAt == null && this.finishedAt == null && this.plan.getStatus() != PlanStatus.completed && this.releasedAt == null;
     }
 
     private void requireAnswerOpen(){
@@ -142,6 +156,9 @@ public class Route {
         }
         if (this.startedAt != null) {
             throw new ConflictException("This route has started, so its answer can't change");
+        }
+        if (this.releasedAt != null) {
+            throw new ConflictException("This route has been released.");
         }
     }
 

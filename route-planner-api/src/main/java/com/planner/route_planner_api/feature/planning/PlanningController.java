@@ -93,5 +93,16 @@ public class PlanningController {
         Long userId = Long.valueOf(jwt.getSubject());
         return planningService.publishPlan(userId, planId, request);
     }
+
+    // Owner only: a turned-down route is closed and its orders go back to pending. Returns the updated plan
+    @PostMapping("/plans/{planId}/routes/{routeId}/release")
+    public PlanResponse releaseRoute(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long planId,
+        @PathVariable Long routeId
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        return planningService.releaseRoute(userId, planId, routeId);
+    }
     
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Depot, Order, Plan, Shift, Vehicle } from '../../core/models';
-import { ROUTE_COLORS, buildPlanView, parseScore, softCostLabel, stopProgress } from './plan-view';
+import { ROUTE_COLORS, buildPlanView, parseScore, routeProgress, softCostLabel, stopProgress } from './plan-view';
 
 const order = (id: number, weight: number): Order => ({
   id, totalWeightKg: weight, status: 'pending', items: [], windowStart: null, windowEnd: null, windowStrict: false,
@@ -101,6 +101,25 @@ describe('stopProgress', () => {
   });
   it('says cancelled when a skipped stop is a cancelled order', () => {
     expect(stopProgress('skipped', 'cancelled').label).toBe('Cancelled');
-    expect(stopProgress('skipped', null).label).toBe('Skipped');
+    expect(stopProgress('skipped', null).label).toBe('Released');
+    expect(stopProgress('skipped', 'pending').label).toBe('Released');
+  });
+});
+
+describe('routeProgress', () => {
+  const route = (assignmentStatus: 'pending' | 'accepted' | 'rejected', startedAt: string | null = null,
+                 finishedAt: string | null = null, releasedAt: string | null = null) =>
+    ({ assignmentStatus, startedAt, finishedAt, releasedAt });
+  it("shows the driver's answer before the route starts", () => {
+    expect(routeProgress(route('pending')).label).toBe('Waiting for driver');
+    expect(routeProgress(route('accepted')).label).toBe('Accepted');
+    expect(routeProgress(route('rejected')).badge).toBe('badge-danger');
+  });
+  it('prefers what the driver did over their answer', () => {
+    expect(routeProgress(route('accepted', '2026-11-18T08:00:00')).label).toBe('On the road');
+    expect(routeProgress(route('accepted', '2026-11-18T08:00:00', '2026-11-18T12:00:00')).label).toBe('Finished');
+  });
+  it('shows a released route as released, not turned down', () => {
+    expect(routeProgress(route('rejected', null, null, '2026-11-18T09:00:00')).label).toBe('Released');
   });
 });

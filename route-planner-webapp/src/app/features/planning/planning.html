@@ -158,8 +158,22 @@
                   <div class="route-title">
                     <h3>{{ route.vehicleName }}</h3>
                     <span class="small muted">{{ route.driverName || 'No driver yet' }}, {{ route.stops.length }} {{ route.stops.length === 1 ? 'stop' : 'stops' }}</span>
+                    @if (sent()) {
+                      <span class="route-status">
+                        <span class="badge" [class]="route.progress.badge">{{ route.progress.label }}</span>
+                        @if (route.assignmentStatus === 'rejected' && route.rejectionReason) {
+                          <span class="small muted">“{{ route.rejectionReason }}”</span>
+                        }
+                      </span>
+                    }
                   </div>
-                  @if (sent() && route.shareToken) {
+                  @if (published() && route.canRelease) {
+                    <button type="button" class="btn btn-small" (click)="openRelease(route)"
+                            [attr.aria-label]="'Release the orders on ' + route.vehicleName">
+                      <app-icon name="refresh" /> Release orders
+                    </button>
+                  }
+                  @if (sent() && route.shareToken && !route.released) {
                     <button type="button" class="btn btn-small copy-link" (click)="copyDriverLink(route)"
                             [attr.aria-label]="'Copy the no-login link for ' + route.vehicleName">
                       <app-icon [name]="copied() === route.routeId ? 'check' : 'link'" /> {{ copied() === route.routeId ? 'Link copied' : 'Copy driver link' }}
@@ -266,6 +280,18 @@
   [error]="publishError()"
   (confirmed)="publish()"
   (cancelled)="confirmPublish.set(false)" />
+
+<app-confirm
+  [open]="releaseTarget() !== null"
+  heading="Release this route's orders?"
+  [message]="releaseMessage()"
+  action="Release orders"
+  actionClass="btn-danger"
+  cancelLabel="Keep the route"
+  [busy]="releasing()"
+  [error]="releaseError()"
+  (confirmed)="release()"
+  (cancelled)="releaseTarget.set(null)" />
 
 <app-shift-dialog [target]="shiftTarget()" (saved)="shiftSaved()" (closed)="shiftTarget.set(null)" />
 <app-order-dialog [target]="orderTarget()" (saved)="orderSaved()" (closed)="orderTarget.set(null)" />

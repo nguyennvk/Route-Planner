@@ -276,6 +276,9 @@ export interface PlanRoute {
   // the shift starts, so it doesn't wait outside a window. Missing on plans saved before the API sent it
   plannedStart?: string | null;
   plannedEnd?: string | null;
+  // Set once the owner released this turned-down route: it's closed and its orders went back to pending.
+  // Missing on plans saved before the API sent it
+  releasedAt?: string | null;
 }
 
 export interface Plan {
@@ -306,7 +309,8 @@ export interface VehiclePosition {
 
 }
 // Customer tracking (GET /track/{token}, no login). Spelled like the Java enum TrackingStage
-export type TrackingStage = 'scheduled' | 'on_the_way' | 'next' | 'arrived' | 'delivered' | 'failed';
+// not_scheduled: its route was turned down and the owner released it; it waits to be planned again
+export type TrackingStage = 'scheduled' | 'not_scheduled' | 'on_the_way' | 'next' | 'arrived' | 'delivered' | 'failed';
 
 // TrackingResponse.java. Times are LocalDateTime on the company's wall clock, like the rest of the API
 export interface Tracking {

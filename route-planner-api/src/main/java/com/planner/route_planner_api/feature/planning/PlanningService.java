@@ -59,6 +59,7 @@ import com.planner.route_planner_api.feature.route.Route;
 import com.planner.route_planner_api.feature.route.RouteRepository;
 import com.planner.route_planner_api.feature.route.RouteStop;
 import com.planner.route_planner_api.feature.route.RouteStopRepository;
+import com.planner.route_planner_api.feature.route.StopStatus;
 import com.planner.route_planner_api.feature.vehicles.Vehicle;
 import com.planner.route_planner_api.feature.vehicles.VehicleLastPositionRepository;
 import com.planner.route_planner_api.feature.vehicles.VehicleRepository;
@@ -74,9 +75,8 @@ public class PlanningService {
 
     // Created by the Timefold starter from the @PlanningSolution class; just ask for it here
     private final SolverManager<VehicleRoutePlan> solverManager;
-    private final VehicleRepository vehicleRepository;
-    private final AddressRepository addressRepository;
     private final PlanWriter planWriter;
+    private final PlanCompletion planCompletion;
     private final PlanRepository planRepository;
     private final RouteRepository routeRepository;
     private final RouteStopRepository routeStopRepository;
@@ -99,6 +99,7 @@ public class PlanningService {
         AddressRepository addressRepository,
         VehicleRepository vehicleRepository,
         PlanWriter planWriter,
+        PlanCompletion planCompletion,
         PlanRepository planRepository,
         RouteRepository routeRepository,
         RouteStopRepository routeStopRepository,
@@ -110,9 +111,8 @@ public class PlanningService {
     ) {
         this.vehicleLastPositionRepository = vehicleLastPositionRepository;
         this.solverManager = solverManager;
-        this.addressRepository = addressRepository;
-        this.vehicleRepository = vehicleRepository;
         this.planWriter = planWriter;
+        this.planCompletion = planCompletion;
         this.planRepository = planRepository;
         this.routeRepository = routeRepository;
         this.routeStopRepository = routeStopRepository;
@@ -303,6 +303,35 @@ public class PlanningService {
 
         // TODO request.notifyDrivers(): no notification channel yet (push / email / Kafka)
         return PlanResponse.from(plan, routes, stops, List.of());
+    }
+
+    // The owner's answer to a turned-down route: close it for good and put its orders back on the planning list.
+    // All in one transaction: the driver can't take the route back (Route.release), its stops are skipped so no
+    // lookup treats them as live, and the orders are pending again so the next solve can pick them up.
+    // Stops already skipped (their order was cancelled) are left alone. @Version on Route makes a driver accepting
+    // at the same moment a 409 for one of the two instead of a half-applied mix
+    @Transactional
+    public PlanResponse releaseRoute(Long userId, Long planId, Long routeId) {
+        Route route = routeRepository.findById(routeId)
+            .filter(r -> r.getPlan().getId().equals(planId))      // a route of another plan: as if it didn't exist
+            .orElseThrow(() -> new ResourceNotFoundException("Route", routeId));
+        Plan plan = route.getPlan();
+        // Not a member of the route's company -> same 404 as an unknown id, so ids from other companies don't leak
+        CompanyMember member = companyAccess.findActiveMember(plan.getCompany().getId(), userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Route", routeId));
+        companyAccess.requireOwner(member);
+
+        route.release();
+        routeStopRepository.findByRoute(route).stream()
+            .filter(stop -> stop.getStatus() == StopStatus.pending)
+            .forEach(stop -> {
+                stop.skip();
+                stop.getOrder().release();
+            });
+        planCompletion.completeIfDone(plan);     // this may have been the last route the plan was waiting for
+
+        List<Route> routes = routeRepository.findByPlan(plan);
+        return PlanResponse.from(plan, routes, routeStopRepository.findByRouteIn(routes), List.of());
     }
 
     // Every shift needs prices: a missing one would cost $0, and the solver would load everything onto it

@@ -22,20 +22,28 @@ public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     // The order's stop on the plan sent to drivers. Every solve writes stops, so an order also has rows on
     // draft plans, all 'pending': only the plan's status tells the real one apart. Newest plan first.
     // Fetches what TrackingResponse.from reads, so building the response needs no extra queries.
+    // Most recently published plan first. After a release the order also has a dead (skipped) stop on the old
+    // plan, but it can only be published again after the release (markPlanned needs pending), so the latest
+    // publish is always its current stop. Not planDate or id: a re-plan can be for an earlier day, or a draft
+    // solved before the release. Plans published before publishedAt existed have null: put those last
     @Query("""
         select s from RouteStop s
         join fetch s.route r join fetch r.plan p join fetch p.company
         join fetch s.order o join fetch o.address
         where o.id = :orderId and p.status in :statuses
-        order by p.planDate desc, p.id desc
+        order by p.publishedAt desc nulls last, p.id desc
+        limit 1
         """)
-    List<RouteStop> findForTracking(Long orderId, Collection<PlanStatus> statuses);
+    Optional<RouteStop> findForTracking(Long orderId, Collection<PlanStatus> statuses);
 
     // Stops planned before this one that aren't finished yet (pending, arrived)
     int countByRouteIdAndSequenceLessThanAndStatusIn(Long routeId, Integer sequence,
                                                   Collection<StopStatus> statuses);
 
-    // The order's stop on the published plan. Drafts hold stops for the same order too, so a plain findByOrder
-    // finds several rows and throws; an order can only be planned on one published plan (markPlanned checks)
-    Optional<RouteStop> findByOrderAndRoute_Plan_Status(Order order, PlanStatus status);
+    // The order's live stop on a published plan. Drafts hold stops for the same order too, so a plain findByOrder
+    // finds several rows and throws. Filtering by stop status matters as well: a released route leaves a skipped
+    // stop on its (still published) plan, and once the order is planned again it has two published stops.
+    // Only one of them is open, because release skips the old one in the same transaction
+    Optional<RouteStop> findByOrderAndRoute_Plan_StatusAndStatusIn(Order order, PlanStatus planStatus,
+                                                                  Collection<StopStatus> stopStatuses);
 }

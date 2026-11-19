@@ -53,6 +53,7 @@
 .route-swatch { flex: none; align-self: stretch; width: 6px; min-height: 34px; border-radius: 3px; }
 .route-title { flex: 1; min-width: 140px; }
 .route-title h3 { font-size: 16px; }
+.route-status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .load { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; min-width: 170px; color: var(--ink-soft); }
 .load-value { font-weight: 700; color: var(--ink); }
 .meter { display: block; width: 100%; height: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden; }

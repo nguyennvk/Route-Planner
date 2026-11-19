@@ -63,8 +63,9 @@ export class Planning {
 
   // Orders on a published plan are planned now. Hiding them here rather than reloading keeps them in the
   // lookups, so the plan doesn't blink out while the planned orders load.
+  // Skipped stops don't count: a released route's orders are pending again and belong in the list
   private readonly publishedOrderIds = computed(() => new Set(this.saved()?.plan.status === 'published'
-    ? this.saved()!.plan.routes.flatMap((route) => route.stops.map((stop) => stop.orderId)) : []));
+    ? this.saved()!.plan.routes.flatMap((route) => route.stops.filter((stop) => stop.status !== 'skipped').map((stop) => stop.orderId)) : []));
   protected readonly candidates = computed(() => (this.data.hasValue()
     ? this.data.value().candidates.filter((order) => !this.publishedOrderIds().has(order.id)) : []));
   protected readonly shifts = computed(() => (this.data.hasValue() ? this.data.value().shifts : []));
@@ -421,6 +422,47 @@ export class Planning {
       error: (error: unknown) => {
         this.publishing.set(false);
         this.publishError.set(publishErrorMessage(error));
+      },
+    });
+  }
+
+  // Releasing a turned-down route: its orders go back to pending, so the owner can plan them again
+  protected readonly releaseTarget = signal<RouteView | null>(null);
+  protected readonly releasing = signal(false);
+  protected readonly releaseError = signal<string | null>(null);
+  protected readonly releaseMessage = computed(() => {
+    const route = this.releaseTarget();
+    if (!route) return '';
+    const driver = route.driverName ?? 'The driver';
+    const orders = countOf(route.stops.filter((stop) => stop.status === 'pending').length, 'order');
+    return `${driver} won't be able to take this route back. Its ${orders} go back to the order list as pending, `
+      + `so you can put them in a new plan. Customers see that their delivery is being rescheduled.`;
+  });
+
+  protected openRelease(route: RouteView): void {
+    this.releaseError.set(null);
+    this.releaseTarget.set(route);
+  }
+
+  protected release(): void {
+    const saved = this.saved();
+    const route = this.releaseTarget();
+    if (!saved || !route || this.releasing()) return;
+    this.releasing.set(true);
+    this.releaseError.set(null);
+    this.api.releaseRoute(saved.plan.planId, route.routeId).subscribe({
+      next: (plan) => {
+        this.releasing.set(false);
+        this.releaseTarget.set(null);
+        // Like publishing, the response doesn't know which orders were left out at solve time
+        this.keepFresh({ ...plan, unassignedOrderIds: saved.plan.unassignedOrderIds });
+        this.dayPlans.reload();         // the plan may be completed now
+        this.data.reload();             // the released orders are pending again: they join the order list
+        this.plannedOrders.reload();    // and are no longer planned
+      },
+      error: (error: unknown) => {
+        this.releasing.set(false);
+        this.releaseError.set(errorMessage(error));
       },
     });
   }

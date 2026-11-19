@@ -30,6 +30,13 @@
             <p class="small muted">{{ t.companyName }} will contact you to arrange another time.</p>
           </div>
         }
+        @case ('not_scheduled') {
+          <app-icon name="clock" [size]="28" />
+          <div>
+            <strong>Your order is still coming, but it needs a new delivery time.</strong>
+            <p class="small muted">{{ t.companyName }} is planning it again. This page will show the new time once it's set.</p>
+          </div>
+        }
         @case ('arrived') {
           <app-icon name="pin" [size]="28" />
           <div>

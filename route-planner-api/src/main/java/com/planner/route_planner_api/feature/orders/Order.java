@@ -171,7 +171,9 @@ public class Order extends BaseEntity {
             throw new ConflictException("Order " + getId() + " is " + status + ", not pending");
         }
         this.status = OrderStatus.planned;
-        this.trackingToken = UUID.randomUUID().toString();
+        if (this.trackingToken == null) {
+            this.trackingToken = UUID.randomUUID().toString();
+        }
     }
 
     // The driver started the route this order is on
@@ -202,6 +204,14 @@ public class Order extends BaseEntity {
 
     public void cancel() {
         this.status = OrderStatus.cancelled;
+    }
+
+    public void release() {
+        if (this.getStatus() != OrderStatus.planned) {
+            throw new ConflictException("Cannot release order that are not planned.");
+        }
+        this.status = OrderStatus.pending;
+
     }
 
     // Compare by id: the lines may hold Hibernate proxies, which are never == to the loaded Item object

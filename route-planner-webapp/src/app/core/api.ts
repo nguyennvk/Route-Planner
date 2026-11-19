@@ -117,6 +117,8 @@ export class Api {
   plan(planId: number) { return this.http.get<Plan>(`${API}/plans/${planId}`); }
   // Owner only. Every route needs a driver, and the plan's orders become 'planned'
   publishPlan(planId: number, body: { notifyDrivers: boolean }) { return this.http.post<Plan>(`${API}/plans/${planId}/publish`, body); }
+  // Owner only. Closes a turned-down route and puts its orders back to pending; returns the updated plan
+  releaseRoute(planId: number, routeId: number) { return this.http.post<Plan>(`${API}/plans/${planId}/routes/${routeId}/release`, {}); }
   // Owner/dispatcher. Last known position of each van on a route in progress; vans that haven't sent one are left out
   planPositions(planId: number) { return this.http.get<VehiclePosition[]>(`${API}/plans/${planId}/positions`); }
 

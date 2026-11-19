@@ -27,6 +27,7 @@ import com.planner.route_planner_api.feature.customers.dto.TrackingResponse;
 import com.planner.route_planner_api.feature.customers.dto.UpdateCustomerRequest;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderRepository;
+import com.planner.route_planner_api.feature.orders.OrderStatus;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
 import com.planner.route_planner_api.feature.planning.geo_provider.OsrmAPI;
 import com.planner.route_planner_api.feature.planning.geo_provider.OsrmRouteResponse;
@@ -153,7 +154,6 @@ public class CustomerService {
         );
         // The stop on the published plan, not a draft's copy (completed: the plan is over but still tracked)
         RouteStop routeStop = routeStopRepository.findForTracking(order.getId(), List.of(PlanStatus.published, PlanStatus.completed))
-            .stream().findFirst()
             .orElseThrow(() -> new ResourceNotFoundException("Order", trackToken));   // not sent to a driver yet
         Route route = routeStop.getRoute();
         int stopsBefore = routeStopRepository.countByRouteIdAndSequenceLessThanAndStatusIn(
@@ -170,7 +170,7 @@ public class CustomerService {
         Eta eta = switch (stage) {
             case next -> nextEta(routeStop, route, position, now);
             case scheduled, on_the_way -> plannedEta(routeStop, route, now);
-            case arrived, delivered, failed -> Eta.NONE;     // at the door or done: no time to predict
+            case arrived, delivered, failed, not_scheduled -> Eta.NONE;     // at the door or done: no time to predict
         };
         return TrackingResponse.from(routeStop, stage, stopsBefore, eta.start(), eta.end(), eta.delay(), position, eta.geometry());
     }
@@ -246,8 +246,8 @@ public class CustomerService {
     private TrackingStage stageOf(RouteStop stop, Route route, long stopsBefore) {
         switch (stop.getStatus()) {
             case delivered: return TrackingStage.delivered;                  // 1. done: success
-            case failed:
-            case skipped:   return TrackingStage.failed;                     // 2. done: not delivered
+            case failed:    return TrackingStage.failed;
+            case skipped:   return stop.getOrder().getStatus() == OrderStatus.cancelled ? TrackingStage.failed : TrackingStage.not_scheduled;                     // 2. done: not delivered
             case arrived:   return TrackingStage.arrived;                    // 3. driver is at the door
             default:        break;                                           // pending: look at the route
         }

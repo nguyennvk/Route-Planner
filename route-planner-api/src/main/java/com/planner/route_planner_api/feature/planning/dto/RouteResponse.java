@@ -24,7 +24,8 @@ public record RouteResponse(
     LocalDateTime finishedAt,
     String shareToken,                      // the driver's no-login link; only the owner, the driver and the link's holder get routes
     LocalDateTime plannedStart,             // when the solver has the van leave the depot and get back, on the company's clock
-    LocalDateTime plannedEnd
+    LocalDateTime plannedEnd,
+    LocalDateTime releasedAt                // set once the owner released a turned-down route; its orders went back to pending
 ) {
     public static RouteResponse toRoute(Route route, List<RouteStop> stops, ZoneId zone) {
         List<StopResponse> stopResponses = stops.stream()
@@ -44,7 +45,8 @@ public record RouteResponse(
             ZonedTime.toLocalDateTime(route.getFinishedAt(), zone),
             route.getShareToken(),
             ZonedTime.toLocalDateTime(route.getPlannedStart(), zone),
-            ZonedTime.toLocalDateTime(route.getPlannedEnd(), zone)
+            ZonedTime.toLocalDateTime(route.getPlannedEnd(), zone),
+            ZonedTime.toLocalDateTime(route.getReleasedAt(), zone)
         );
     }
 

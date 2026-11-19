@@ -37,6 +37,7 @@ import com.planner.route_planner_api.feature.orders.dto.OrderResponse;
 import com.planner.route_planner_api.feature.orders.dto.UpdateOrderRequest;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
 import com.planner.route_planner_api.feature.route.RouteStop;
+import com.planner.route_planner_api.feature.route.StopStatus;
 import com.planner.route_planner_api.feature.route.RouteStopRepository;
 
 import jakarta.persistence.criteria.Predicate;
@@ -178,7 +179,8 @@ public class OrderService {
         // Planned: its stop is on a route a driver already has, so mark it skipped and nobody drives there.
         // The route hasn't started (the order would be out_for_delivery), so the stop is still pending
         if (order.getStatus() == OrderStatus.planned) {
-            routeStopRepository.findByOrderAndRoute_Plan_Status(order, PlanStatus.published)
+            routeStopRepository.findByOrderAndRoute_Plan_StatusAndStatusIn(
+                    order, PlanStatus.published, List.of(StopStatus.pending))
                 .ifPresent(RouteStop::skip);
         }
         order.cancel();

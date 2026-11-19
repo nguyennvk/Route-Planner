@@ -24,10 +24,9 @@ import com.planner.route_planner_api.feature.drivers.dto.PositionRequest;
 import com.planner.route_planner_api.feature.drivers.dto.StopFailRequest;
 import com.planner.route_planner_api.feature.orders.Order;
 import com.planner.route_planner_api.feature.orders.OrderStatus;
-import com.planner.route_planner_api.feature.planning.Plan;
+import com.planner.route_planner_api.feature.planning.PlanCompletion;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
 import com.planner.route_planner_api.feature.planning.dto.RouteResponse;
-import com.planner.route_planner_api.feature.route.AssignementStatus;
 import com.planner.route_planner_api.feature.route.Route;
 import com.planner.route_planner_api.feature.route.RouteRepository;
 import com.planner.route_planner_api.feature.route.RouteStop;
@@ -47,19 +46,22 @@ public class DriverService {
     private final VehicleLastPositionRepository vehicleLastPositionRepository;
     private final CompanyAccess companyAccess;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final PlanCompletion planCompletion;
 
     public DriverService(
         RouteRepository routeRepository,
         RouteStopRepository routeStopRepository,
         VehicleLastPositionRepository vehicleLastPositionRepository,
         CompanyAccess companyAccess,
-        SimpMessagingTemplate simpMessagingTemplate
+        SimpMessagingTemplate simpMessagingTemplate,
+        PlanCompletion planCompletion
     ) {
         this.routeRepository = routeRepository;
         this.routeStopRepository = routeStopRepository;
         this.vehicleLastPositionRepository = vehicleLastPositionRepository;
         this.companyAccess = companyAccess;
         this.simpMessagingTemplate = simpMessagingTemplate;
+        this.planCompletion = planCompletion;
     }
 
     // The logged-in driver's routes, earliest first
@@ -250,16 +252,8 @@ public class DriverService {
                 + open.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         }
         route.finish();
-        completePlanIfDone(route.getPlan());
+        planCompletion.completeIfDone(route.getPlan());
         return toResponse(route, stops);
-    }
-
-    // Done when every route has finished or was turned down. A route nobody answered or started keeps the plan open
-    private void completePlanIfDone(Plan plan) {
-        if (plan.getStatus() != PlanStatus.published) return;
-        boolean done = routeRepository.findByPlan(plan).stream()
-            .allMatch(r -> r.getFinishedAt() != null || r.getAssignmentStatus() == AssignementStatus.rejected);
-        if (done) plan.complete();
     }
 
     private RouteResponse arrive(Route route, Long stopId) {

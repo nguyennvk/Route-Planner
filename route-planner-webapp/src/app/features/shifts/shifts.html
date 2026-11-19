@@ -36,8 +36,13 @@
               <td class="timeline-cell"><div class="timeline" aria-hidden="true"><div class="bar" [style.left]="bar(shift).left" [style.width]="bar(shift).width"></div></div></td>
               @if (ctx.isOwner()) {
                 <td class="row-actions">
-                  <button type="button" class="btn btn-small" (click)="dialogTarget.set(shift)"><app-icon name="pencil" /> Edit</button>
-                  <button type="button" class="btn btn-small btn-danger" aria-label="Delete shift" (click)="openDelete(shift)"><app-icon name="trash" /></button>
+                  <!-- On a published route the API refuses changes until the owner releases that route -->
+                  @if (shift.published) {
+                    <span class="badge badge-warn" title="Release its route on the Planning page to change it"><app-icon name="alert" [size]="14" /> On a published plan</span>
+                  } @else {
+                    <button type="button" class="btn btn-small" (click)="dialogTarget.set(shift)"><app-icon name="pencil" /> Edit</button>
+                    <button type="button" class="btn btn-small btn-danger" aria-label="Delete shift" (click)="openDelete(shift)"><app-icon name="trash" /></button>
+                  }
                 </td>
               }
             </tr>

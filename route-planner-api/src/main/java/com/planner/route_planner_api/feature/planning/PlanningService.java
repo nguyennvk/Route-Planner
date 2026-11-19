@@ -141,6 +141,7 @@ public class PlanningService {
         // Retrieve data from request
         List<VehicleShift> shifts = vehicleShiftRepository.findByVehicleCompanyIdAndIdIn(companyId, request.shiftIds());
         requireShiftsOnSameDate(shifts, request.planDate(), ZoneId.of(company.getTimezone()));
+        requireShiftsFree(shifts);
         Map<Long, VehicleShift> shiftsById = shifts.stream().collect(Collectors.toMap(VehicleShift::getId, Function.identity()));
 
         // Get invalid shiftIds
@@ -274,6 +275,19 @@ public class PlanningService {
         return PlanResponse.from(plan, routes, stops, List.of());
     }
 
+    // Early answer for a shift that's already out on a published plan: that plan could never be published
+    // (claim() refuses at publish), so don't spend a solve on it. The check that guarantees it is at publish
+    private static void requireShiftsFree(List<VehicleShift> shifts) {
+        List<String> taken = shifts.stream()
+            .filter(VehicleShift::isPublished)
+            .map(shift -> shift.getVehicle().getName())
+            .toList();
+        if (!taken.isEmpty()) {
+            throw new ConflictException("Already on a published plan: " + String.join(", ", taken)
+                + ". Leave these vehicles out, or release their route first");
+        }
+    }
+
     private static void requireShiftsOnSameDate(List<VehicleShift> shifts, LocalDate date, ZoneId zone) {
         Instant dayStart = ZonedTime.startOfDay(date, zone);
         Instant dayEnd = ZonedTime.startOfDay(date.plusDays(1), zone);
@@ -313,6 +327,9 @@ public class PlanningService {
 
         List<RouteStop> stops = routeStopRepository.findByRouteIn(routes);
         stops.forEach(stop -> stop.getOrder().markPlanned());   // throws if an order was cancelled or planned elsewhere
+        // Same for vans and drivers: each shift can be out on one published route only. claim() throws if
+        // another plan already has it; @Version on the shift catches two publishes racing for it
+        routes.forEach(route -> route.getVehicleShift().claim(route));
         plan.publish();
 
         // TODO request.notifyDrivers(): no notification channel yet (push / email / Kafka)
@@ -336,6 +353,7 @@ public class PlanningService {
         companyAccess.requireOwner(member);
 
         route.release();
+        route.getVehicleShift().free();     // the van and driver can go into the next plan
         routeStopRepository.findByRoute(route).stream()
             .filter(stop -> stop.getStatus() == StopStatus.pending)
             .forEach(stop -> {
@@ -346,6 +364,23 @@ public class PlanningService {
 
         List<Route> routes = routeRepository.findByPlan(plan);
         return PlanResponse.from(plan, routes, routeStopRepository.findByRouteIn(routes), List.of());
+    }
+
+    @Transactional 
+    public void deletePlan(Long userId, Long planId) {
+        Plan plan = planRepository.findById(planId).orElseThrow(
+            () -> new ResourceNotFoundException("Plan", planId)
+        );
+
+        Company company = plan.getCompany();
+        CompanyMember member = companyAccess.findActiveMember(company.getId(), userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Plan", planId));
+        companyAccess.requireOwner(member);
+
+        if (plan.getStatus() != PlanStatus.draft && plan.getStatus() != PlanStatus.failed) {
+            throw new ConflictException("Only a draft or failed plan can be deleted; this one is " + plan.getStatus());
+        }
+        planRepository.delete(plan);        
     }
 
     // Every shift needs prices: a missing one would cost $0, and the solver would load everything onto it

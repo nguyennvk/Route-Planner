@@ -12,7 +12,8 @@ public record VehicleShiftResponse(
     Long driverUserId,
     String driverName,
     Instant startAt,
-    Instant endAt
+    Instant endAt,
+    boolean published           // on a published route: can't be edited, deleted or put in another plan
 ) {
     // Expects vehicle and driver to be loaded already (join fetch), otherwise each call runs extra queries
     public static VehicleShiftResponse from(VehicleShift shift) {
@@ -24,7 +25,8 @@ public record VehicleShiftResponse(
             driver == null ? null : driver.getId(),
             driver == null ? null : driver.getFullName(),
             shift.getStartAt(),
-            shift.getEndAt()
+            shift.getEndAt(),
+            shift.isPublished()     // the claim's id is in the shift row, so this runs no query
         );
     }
 }

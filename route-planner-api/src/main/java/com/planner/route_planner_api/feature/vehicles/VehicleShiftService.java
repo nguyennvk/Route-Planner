@@ -16,6 +16,8 @@ import com.planner.route_planner_api.common.web.PageResponse;
 import com.planner.route_planner_api.feature.auth.User;
 import com.planner.route_planner_api.feature.companies.CompanyAccess;
 import com.planner.route_planner_api.feature.companies.CompanyMember;
+import com.planner.route_planner_api.feature.route.Route;
+import com.planner.route_planner_api.feature.route.RouteRepository;
 import com.planner.route_planner_api.feature.vehicles.vehicle_shift.dto.UpdateVehicleShiftRequest;
 import com.planner.route_planner_api.feature.vehicles.vehicle_shift.dto.VehicleShiftRequest;
 import com.planner.route_planner_api.feature.vehicles.vehicle_shift.dto.VehicleShiftResponse;
@@ -28,15 +30,18 @@ public class VehicleShiftService {
 
     private final VehicleShiftRepository vehicleShiftRepository;
     private final VehicleRepository vehicleRepository;
+    private final RouteRepository routeRepository;
     private final CompanyAccess companyAccess;
 
     public VehicleShiftService(
             VehicleShiftRepository vehicleShiftRepository,
             VehicleRepository vehicleRepository,
+            RouteRepository routeRepository,
             CompanyAccess companyAccess
         ){
         this.vehicleShiftRepository = vehicleShiftRepository;
         this.vehicleRepository = vehicleRepository;
+        this.routeRepository = routeRepository;
         this.companyAccess = companyAccess;
     }
 
@@ -102,6 +107,10 @@ public class VehicleShiftService {
     @Transactional
     public void deleteShift(Long userId, Long shiftId){
         VehicleShift shift = findShiftForOwner(shiftId, userId);
+        shift.requireFree();        // a published route points at it; a readable 409 instead of a foreign key error
+        if (routeRepository.existsByVehicleShift(shift)) {
+            throw new ConflictException("This shift is used by a plan. Delete its draft plans first; shifts on sent plans are kept as history");
+        }
         vehicleShiftRepository.delete(shift);
     }
 

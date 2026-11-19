@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 
 import com.planner.route_planner_api.feature.planning.Plan;
 import com.planner.route_planner_api.feature.planning.PlanStatus;
+import com.planner.route_planner_api.feature.vehicles.Vehicle;
+import com.planner.route_planner_api.feature.vehicles.VehicleShift;
 
 // The driver queries load plan + company in the same SELECT: the response needs the company's timezone,
 // and loading it lazily would be one extra query per route
@@ -46,6 +48,7 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
         """)
     List<PlanCounts> countByPlanIds(@Param("planIds") Collection<Long> planIds);
 
+    boolean existsByVehicleShift(VehicleShift shift);
     // Spring Data fills this interface from the query's column aliases
     interface PlanCounts {
         Long getPlanId();

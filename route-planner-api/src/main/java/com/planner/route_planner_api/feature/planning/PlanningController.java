@@ -4,15 +4,17 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.format.annotation.DateTimeFormat;
-
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.planner.route_planner_api.feature.planning.dto.PlanPublishRequest;
@@ -63,6 +65,16 @@ public class PlanningController {
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
         return planningService.listPlans(userId, companyId, date, from, to, status, page, size);
+    }
+
+    @DeleteMapping ("/plans/{planId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePlan(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long planId
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        planningService.deletePlan(userId, planId);
     }
 
     @GetMapping("/plans/{planId}")

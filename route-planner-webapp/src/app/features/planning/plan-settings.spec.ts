@@ -3,7 +3,7 @@ import { Shift, Vehicle } from '../../core/models';
 import { DEFAULT_PLAN_SETTINGS, PlanSettings, readPlanSettings, settingsValid, toSolveRequest, writePlanSettings } from './plan-settings';
 
 const vehicle = (id: number, type: Vehicle['type']): Vehicle => ({ id, name: `V${id}`, type, capacityKg: 100, capacityM3: null, homeDepotId: 1, active: true });
-const shift = (id: number, vehicleId: number): Shift => ({ id, vehicleId, vehicleName: '', driverUserId: null, driverName: null, startAt: '', endAt: '' });
+const shift = (id: number, vehicleId: number): Shift => ({ id, vehicleId, vehicleName: '', driverUserId: null, driverName: null, startAt: '', endAt: '', published: false });
 
 describe('toSolveRequest', () => {
   it('prices every shift in cents by its vehicle type', () => {

@@ -10,7 +10,7 @@ const order = (id: number, weight: number): Order => ({
 });
 const vehicle: Vehicle = { id: 7, name: 'Van 7', type: 'van', capacityKg: 100, capacityM3: null, homeDepotId: 3, active: true };
 const depot = { id: 3, name: 'Main', address: {} } as Depot;
-const shift: Shift = { id: 20, vehicleId: 7, vehicleName: 'Van 7', driverUserId: 4, driverName: 'Liam', startAt: '', endAt: '' };
+const shift: Shift = { id: 20, vehicleId: 7, vehicleName: 'Van 7', driverUserId: 4, driverName: 'Liam', startAt: '', endAt: '', published: false };
 
 const planBase = { planId: 1, name: 'p', status: 'draft' as const, planDate: '2026-11-02' };
 

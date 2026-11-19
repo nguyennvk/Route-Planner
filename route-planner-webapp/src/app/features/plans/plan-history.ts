@@ -5,6 +5,8 @@ import { Api } from '../../core/api';
 import { CompanyContext } from '../../core/company-context';
 import { PlanStatus, PlanSummary } from '../../core/models';
 import { companyLocalToInstant, formatDateTime, formatDay } from '../../core/time';
+import { errorMessage } from '../../core/errors';
+import { Confirm } from '../../shared/confirm';
 import { Icon } from '../../shared/icon';
 import { LoadState } from '../../shared/load-state';
 import { Pager } from '../../shared/pager';
@@ -21,7 +23,7 @@ const STATUS: Record<PlanStatus, { label: string; badge: string }> = {
 // Every plan the company has made, newest day first. Opening one shows it on the Plan routes page for its day
 @Component({
   selector: 'app-plan-history',
-  imports: [RouterLink, Icon, LoadState, Pager],
+  imports: [RouterLink, Confirm, Icon, LoadState, Pager],
   template: `
     <div class="page">
       <div class="page-head">
@@ -87,6 +89,10 @@ const STATUS: Record<PlanStatus, { label: string; badge: string }> = {
                     @if (plan.routeCount > 0) {
                       <button type="button" class="btn btn-small" (click)="open(plan)">Open</button>
                     }
+                    @if (ctx.isOwner() && deletable(plan)) {
+                      <button type="button" class="btn btn-small btn-danger" [attr.aria-label]="'Delete plan #' + plan.planId"
+                              (click)="openDelete(plan)"><app-icon name="trash" /></button>
+                    }
                   </td>
                 </tr>
               }
@@ -98,6 +104,16 @@ const STATUS: Record<PlanStatus, { label: string; badge: string }> = {
         <app-load-state [error]="plans.error()" (retry)="plans.reload()" />
       }
     </div>
+
+    <app-confirm
+      [open]="deleteTarget() !== null"
+      [heading]="'Delete plan #' + (deleteTarget()?.planId ?? '') + '?'"
+      message="Its routes are removed. Its orders stay pending and its shifts stay as they are. This can't be undone."
+      action="Delete plan"
+      [busy]="deleting()"
+      [error]="deleteError()"
+      (confirmed)="deletePlan()"
+      (cancelled)="deleteTarget.set(null)" />
   `,
 })
 export class PlanHistory {
@@ -125,6 +141,38 @@ export class PlanHistory {
     }),
     stream: ({ params: { id, page, status, from, to } }) => this.api.plans(id, { status, from, to, page, size: 20 }),
   });
+
+  // Same rule as the API: a sent plan is history (orders, tracking links, claimed shifts point at it)
+  protected deletable(plan: PlanSummary): boolean { return plan.status === 'draft' || plan.status === 'failed'; }
+
+  protected readonly deleteTarget = signal<PlanSummary | null>(null);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal<string | null>(null);
+
+  protected openDelete(plan: PlanSummary): void {
+    this.deleteError.set(null);
+    this.deleteTarget.set(plan);
+  }
+
+  protected deletePlan(): void {
+    const plan = this.deleteTarget();
+    if (!plan || this.deleting()) return;
+    this.deleting.set(true);
+    this.deleteError.set(null);
+    this.api.deletePlan(plan.planId).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.deleteTarget.set(null);
+        // The last row of a later page: step back so the page isn't empty
+        if (this.plans.hasValue() && this.plans.value().content.length === 1 && this.page() > 0) this.page.update((p) => p - 1);
+        else this.plans.reload();
+      },
+      error: (error: unknown) => {
+        this.deleting.set(false);
+        this.deleteError.set(errorMessage(error));
+      },
+    });
+  }
 
   protected clearFilters(): void {
     this.statusFilter.set(null);

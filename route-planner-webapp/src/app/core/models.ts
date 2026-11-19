@@ -118,6 +118,9 @@ export interface Shift {
   driverName: string | null;
   startAt: string;
   endAt: string;
+  // On a published route (VehicleShift.publishedRoute): the API refuses to edit, delete or solve with it
+  // until that route is released
+  published: boolean;
 }
 
 export interface ShiftRequest {

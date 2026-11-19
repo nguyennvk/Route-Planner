@@ -34,11 +34,15 @@
           <ul class="pick-list">
             @for (shift of shifts(); track shift.id) {
               <li class="pick-row"><label class="check pick">
-                <input type="checkbox" [checked]="!excludedShifts().has(shift.id)" (change)="toggle('shifts', shift.id, $any($event.target).checked)" />
-                <span class="pick-main"><strong>{{ shift.vehicleName }}</strong><span class="small muted">{{ shift.driverName || 'No driver yet' }}</span></span>
+                <input type="checkbox" [checked]="!shift.published && !excludedShifts().has(shift.id)" [disabled]="shift.published"
+                       (change)="toggle('shifts', shift.id, $any($event.target).checked)" />
+                <span class="pick-main"><strong>{{ shift.vehicleName }}</strong><span class="small muted">{{ shift.driverName || 'No driver yet' }}</span>
+                  @if (shift.published) {
+                    <span class="badge badge-warn published-shift"><app-icon name="alert" [size]="14" /> On a published plan</span>
+                  }</span>
                 <span class="mono small nowrap">{{ time(shift.startAt) }}–{{ time(shift.endAt) }}</span>
               </label>
-              @if (ctx.isOwner()) {
+              @if (ctx.isOwner() && !shift.published) {
                 <button type="button" class="btn btn-quiet btn-icon edit" [disabled]="solving()" [attr.aria-label]="'Edit shift for ' + shift.vehicleName" (click)="shiftTarget.set(shift)"><app-icon name="pencil" /></button>
               }</li>
             } @empty {
@@ -121,6 +125,9 @@
                     <a [routerLink]="ctx.link('shifts')">Assign one on Shifts</a>, then solve again.</span></p>
                 }
               </div>
+              @if (ctx.isOwner()) {
+                <button type="button" class="btn btn-danger" (click)="openDelete()"><app-icon name="trash" /> Delete draft</button>
+              }
               <button type="button" class="btn btn-primary" [disabled]="routesWithoutDriver().length > 0" (click)="openPublish()">Publish to drivers</button>
             }
           </section>
@@ -292,6 +299,16 @@
   [error]="releaseError()"
   (confirmed)="release()"
   (cancelled)="releaseTarget.set(null)" />
+
+<app-confirm
+  [open]="confirmDelete()"
+  heading="Delete this draft?"
+  message="Its routes are removed. Its orders stay pending and its shifts stay as they are, so you can solve again. This can't be undone."
+  action="Delete draft"
+  [busy]="deleting()"
+  [error]="deleteError()"
+  (confirmed)="deletePlan()"
+  (cancelled)="confirmDelete.set(false)" />
 
 <app-shift-dialog [target]="shiftTarget()" (saved)="shiftSaved()" (closed)="shiftTarget.set(null)" />
 <app-order-dialog [target]="orderTarget()" (saved)="orderSaved()" (closed)="orderTarget.set(null)" />

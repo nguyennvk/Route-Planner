@@ -31,6 +31,7 @@
 .pick-main { flex: 1; min-width: 0; }
 .pick-main strong, .pick-main .small { display: block; }
 .pick-main strong { font-weight: 600; }
+.published-shift { margin-top: 4px; }
 .pick-side { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
 .orders-list { max-height: 480px; overflow-y: auto; }
 .none { padding: 14px; color: var(--ink-muted); }

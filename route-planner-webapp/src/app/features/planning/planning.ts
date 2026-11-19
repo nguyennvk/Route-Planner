@@ -74,7 +74,8 @@ export class Planning {
   protected readonly excludedOrders = signal<ReadonlySet<number>>(new Set());
   protected readonly excludedShifts = signal<ReadonlySet<number>>(new Set());
   protected readonly selectedOrders = computed(() => this.candidates().filter((order) => !this.excludedOrders().has(order.id)));
-  protected readonly selectedShifts = computed(() => this.shifts().filter((shift) => !this.excludedShifts().has(shift.id)));
+  // A shift already out on a published plan can't go into another one (the API answers 409), so it's never selected
+  protected readonly selectedShifts = computed(() => this.shifts().filter((shift) => !shift.published && !this.excludedShifts().has(shift.id)));
   protected readonly selectedWeight = computed(() => this.selectedOrders().reduce((sum, order) => sum + order.totalWeightKg, 0));
 
   protected toggle(target: 'orders' | 'shifts', id: number, included: boolean): void {
@@ -463,6 +464,42 @@ export class Planning {
       error: (error: unknown) => {
         this.releasing.set(false);
         this.releaseError.set(errorMessage(error));
+      },
+    });
+  }
+
+  // Deleting the draft on screen. Only drafts reach this page's button: failed plans aren't choosable here
+  // (Plan history can delete those), and sent plans are history the API refuses to delete
+  protected readonly confirmDelete = signal(false);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal<string | null>(null);
+
+  protected openDelete(): void {
+    this.deleteError.set(null);
+    this.confirmDelete.set(true);
+  }
+
+  protected deletePlan(): void {
+    const saved = this.saved();
+    if (!saved || this.deleting()) return;
+    const planId = saved.plan.planId;
+    this.deleting.set(true);
+    this.deleteError.set(null);
+    this.api.deletePlan(planId).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.confirmDelete.set(false);
+        this.freshPlans.update((current) => {
+          const next = new Map(current);
+          next.delete(planId);
+          return next;
+        });
+        this.selection.set(undefined);   // back to the day's newest plan, or none
+        this.dayPlans.reload();
+      },
+      error: (error: unknown) => {
+        this.deleting.set(false);
+        this.deleteError.set(errorMessage(error));
       },
     });
   }

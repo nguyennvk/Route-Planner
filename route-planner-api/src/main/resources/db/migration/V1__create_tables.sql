@@ -23,8 +23,10 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;  -- "no overlapping shifts" constrain
 CREATE TYPE member_role  AS ENUM ('owner', 'dispatcher', 'driver');
 CREATE TYPE vehicle_type AS ENUM ('motorbike', 'car', 'van', 'truck');
 CREATE TYPE order_status AS ENUM ('pending', 'planned', 'out_for_delivery', 'delivered', 'failed', 'cancelled');
-CREATE TYPE plan_status  AS ENUM ('draft', 'solving', 'published', 'completed');
+-- failed: a solve that threw (OSRM down, solver error) ends here instead of staying 'solving' forever
+CREATE TYPE plan_status  AS ENUM ('draft', 'solving', 'published', 'completed', 'failed');
 CREATE TYPE stop_status  AS ENUM ('pending', 'arrived', 'delivered', 'failed', 'skipped');
+CREATE TYPE assignment_status AS ENUM ('pending', 'accepted', 'rejected');   -- the driver's answer to a route
 
 
 -- =============================================================================
@@ -131,6 +133,8 @@ CREATE TABLE vehicle_shifts (
     driver_user_id bigint               REFERENCES users (id),
     start_at       timestamptz NOT NULL,
     end_at         timestamptz NOT NULL,
+    version        int         NOT NULL DEFAULT 0,   -- optimistic locking: two publishes racing for one shift
+    -- published_route_id is added after routes, because the two tables reference each other
 
     CHECK (end_at > start_at),
     -- a vehicle can't be on two overlapping shifts
@@ -184,6 +188,8 @@ CREATE TABLE orders (
     total_weight_kg numeric(10, 2) NOT NULL CHECK (total_weight_kg >= 0),           -- sum of order_items, denormalized for the solver
     notes           text,
     created_at      timestamptz  NOT NULL DEFAULT now(),
+    tracking_token  text UNIQUE,                                      -- for the customer's tracking link
+    version         int          NOT NULL DEFAULT 0,
 
     CHECK (window_end > window_start)   -- passes when either is NULL
 );
@@ -233,15 +239,40 @@ CREATE TABLE routes (
     total_minutes  int             CHECK (total_minutes >= 0),
     total_km       numeric(8, 2)   CHECK (total_km >= 0),
     share_token    text UNIQUE,    -- random token for the driver link
-    started_at     timestamptz,
+    started_at     timestamptz,    -- started_at / finished_at: what the driver actually did
     finished_at    timestamptz,
+    assignment_status assignment_status NOT NULL DEFAULT 'pending',
+    responded_at   timestamptz,
+    rejection_reason text,
+    geometry       text,           -- the OSRM polyline
+    version        int             NOT NULL DEFAULT 0,
+    planned_start  timestamptz,    -- planned_start / planned_end: what the solver planned
+    planned_end    timestamptz,
+    released_at    timestamptz,    -- the owner gave a turned-down route's orders back for re-planning
 
-    CHECK (finished_at >= started_at)
+    CHECK (finished_at >= started_at),
+    CHECK (planned_end >= planned_start),
+    -- Only a turned-down route keeps a reason; accepting clears it
+    CHECK (rejection_reason IS NULL OR assignment_status = 'rejected')
 );
 CREATE UNIQUE INDEX routes_plan_id_vehicle_id_key ON routes (plan_id, vehicle_id);
 CREATE INDEX routes_driver_user_id_started_at_idx  ON routes (driver_user_id, started_at);
 CREATE INDEX routes_vehicle_id_idx ON routes (vehicle_id);
 CREATE INDEX routes_shift_id_idx   ON routes (shift_id);
+
+-- A driver drives one van at a time, and a van is on one route at a time. DriverService checks this on start
+-- with a readable 409; these partial unique indexes are the guarantee when two starts race each other.
+CREATE UNIQUE INDEX routes_one_active_per_driver ON routes (driver_user_id)
+    WHERE started_at IS NOT NULL AND finished_at IS NULL;
+CREATE UNIQUE INDEX routes_one_active_per_vehicle ON routes (vehicle_id)
+    WHERE started_at IS NOT NULL AND finished_at IS NULL;
+
+-- A shift is claimed by the route that took it when its plan was published, the same way an order becomes
+-- 'planned'. Null means free: it can go into a plan that is then published. Released routes give it back.
+-- ON DELETE SET NULL: deleting a plan cascades to its routes, and that must free their shifts, not fail.
+-- UNIQUE: one route per claim (NULLs don't count as duplicates in PostgreSQL, so free shifts are fine).
+ALTER TABLE vehicle_shifts
+    ADD COLUMN published_route_id bigint UNIQUE REFERENCES routes (id) ON DELETE SET NULL;
 
 -- One visit on a route, in order. planned_* vs actual_* kept separate.
 CREATE TABLE route_stops (
@@ -255,7 +286,9 @@ CREATE TABLE route_stops (
     actual_departure  timestamptz,
     status            stop_status NOT NULL DEFAULT 'pending',
     failure_reason    text,
-    proof_photo_url   text
+    proof_photo_url   text,
+    estimated_arrival timestamptz,   -- updated live while driving
+    version           int         NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX route_stops_route_id_sequence_key ON route_stops (route_id, sequence);  -- driver page: stops in order
 CREATE INDEX route_stops_order_id_idx ON route_stops (order_id);                           -- customer page: where is my order?
@@ -272,7 +305,8 @@ CREATE TABLE vehicle_last_positions (
     route_id    bigint REFERENCES routes (id) ON DELETE SET NULL,
     location    geography(Point, 4326) NOT NULL,
     speed_kmh   numeric(5, 1),
-    recorded_at timestamptz NOT NULL
+    recorded_at timestamptz NOT NULL,
+    version     int         NOT NULL DEFAULT 0
 );
 CREATE INDEX vehicle_last_positions_route_id_idx ON vehicle_last_positions (route_id);
 
@@ -323,3 +357,22 @@ CREATE TABLE notifications (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX notifications_order_id_created_at_idx ON notifications (order_id, created_at);
+
+
+-- =============================================================================
+-- Feedback
+-- =============================================================================
+
+-- What visitors and users tell us from the feedback form, including what they'd pay.
+-- Kept even when emailing it fails, so nothing is lost.
+CREATE TABLE feedback (
+    id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name          text,
+    email         text,
+    message       text        NOT NULL CHECK (length(message) <= 4000),
+    price_band    text        NOT NULL CHECK (price_band IN ('nothing', 'under_10', 'from_10_to_20', 'from_20_to_50', 'from_50_to_100', 'not_sure')),
+    price_amount  numeric(10, 2) CHECK (price_amount >= 0),     -- an exact monthly amount, when they gave one
+    emailed_at    timestamptz,                                  -- null: not sent (mail not set up, or it failed)
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX feedback_created_at_idx ON feedback (created_at);

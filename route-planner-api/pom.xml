@@ -102,6 +102,10 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
+		<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
 		<!-- Jakarta Mail, to email feedback to the owner (version managed by Spring Boot) -->
 		<dependency>
 			<groupId>org.eclipse.angus</groupId>

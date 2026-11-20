@@ -1,6 +1,14 @@
 {
   "conventionalCommits.scopes": [
     "planning",
-    "driver"
+    "driver",
+    "rate limit"
+  ],
+  "python-envs.pythonProjects": [
+    {
+      "path": "route-planner-api/src/main/java/com/planner/route_planner_api/common/redis",
+      "envManager": "ms-python.python:venv",
+      "packageManager": "ms-python.python:pip"
+    }
   ]
 }

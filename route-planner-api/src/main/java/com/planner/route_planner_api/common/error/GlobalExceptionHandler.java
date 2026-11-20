@@ -113,6 +113,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler{
         return handleExceptionInternal(ex, problem, headers, status, request);
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyRequests(TooManyRequestsException ex){
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
+        "Too many requests. Try again in " + ex.getRetryAfterSeconds() + " seconds.");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+            .body(problem);
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
         log.error("Unexpected error", ex);
@@ -124,13 +133,4 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler{
 
     public record FieldViolation(String field, String message) {}
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ProblemDetail> handleTooManyRequests(TooManyRequestsException ex){
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
-        "Too many requests. Try again in " + ex.getRetryAfterSeconds() + " seconds.");
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-            .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
-            .body(problem);
-
-    }
 }

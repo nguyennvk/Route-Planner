@@ -25,50 +25,50 @@ public class SharedRouteController {
         this.driverService = driverService;
     }
 
-    @GetMapping("/routes/{token}")
-    public RouteResponse getRouteByToken(@PathVariable String token) {
-        return driverService.getRouteByToken(token);
-    }
+    // @GetMapping("/routes/{token}")
+    // public RouteResponse getRouteByToken(@PathVariable String token) {
+    //     return driverService.getRouteByToken(token);
+    // }
 
-    @PostMapping("/routes/{token}/accept")
-    public RouteResponse acceptRouteByToken(@PathVariable String token) {
-        return driverService.acceptRouteByToken(token);
-    }
+    // @PostMapping("/routes/{token}/accept")
+    // public RouteResponse acceptRouteByToken(@PathVariable String token) {
+    //     return driverService.acceptRouteByToken(token);
+    // }
 
-    @PostMapping("/routes/{token}/reject")
-    public RouteResponse rejectRouteByToken(
-        @PathVariable String token,
-        @Valid @RequestBody DriverRejectRequest request
-    ) {
-        return driverService.rejectRouteByToken(token, request);
-    }
+    // @PostMapping("/routes/{token}/reject")
+    // public RouteResponse rejectRouteByToken(
+    //     @PathVariable String token,
+    //     @Valid @RequestBody DriverRejectRequest request
+    // ) {
+    //     return driverService.rejectRouteByToken(token, request);
+    // }
 
-    @PostMapping("/routes/{token}/start")
-    public RouteResponse startRouteByToken(@PathVariable String token) {
-        return driverService.startRouteByToken(token);
-    }
+    // @PostMapping("/routes/{token}/start")
+    // public RouteResponse startRouteByToken(@PathVariable String token) {
+    //     return driverService.startRouteByToken(token);
+    // }
 
-    @PostMapping("/routes/{token}/finish")
-    public RouteResponse finishRouteByToken(@PathVariable String token) {
-        return driverService.finishRouteByToken(token);
-    }
+    // @PostMapping("/routes/{token}/finish")
+    // public RouteResponse finishRouteByToken(@PathVariable String token) {
+    //     return driverService.finishRouteByToken(token);
+    // }
 
-    @PostMapping("/routes/{token}/stops/{stopId}/arrive")
-    public RouteResponse arriveStopByToken(@PathVariable String token, @PathVariable Long stopId) {
-        return driverService.arriveStopByToken(token, stopId);
-    }
+    // @PostMapping("/routes/{token}/stops/{stopId}/arrive")
+    // public RouteResponse arriveStopByToken(@PathVariable String token, @PathVariable Long stopId) {
+    //     return driverService.arriveStopByToken(token, stopId);
+    // }
 
-    @PostMapping("/routes/{token}/stops/{stopId}/deliver")
-    public RouteResponse deliverStopByToken(@PathVariable String token, @PathVariable Long stopId) {
-        return driverService.deliverStopByToken(token, stopId);
-    }
+    // @PostMapping("/routes/{token}/stops/{stopId}/deliver")
+    // public RouteResponse deliverStopByToken(@PathVariable String token, @PathVariable Long stopId) {
+    //     return driverService.deliverStopByToken(token, stopId);
+    // }
 
-    @PostMapping("/routes/{token}/stops/{stopId}/fail")
-    public RouteResponse failStopByToken(
-        @PathVariable String token,
-        @PathVariable Long stopId,
-        @Valid @RequestBody StopFailRequest request
-    ) {
-        return driverService.failStopByToken(token, stopId, request);
-    }
+    // @PostMapping("/routes/{token}/stops/{stopId}/fail")
+    // public RouteResponse failStopByToken(
+    //     @PathVariable String token,
+    //     @PathVariable Long stopId,
+    //     @Valid @RequestBody StopFailRequest request
+    // ) {
+    //     return driverService.failStopByToken(token, stopId, request);
+    // }
 }
